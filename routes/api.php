@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\ReturnItemController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Middleware\CheckTenantSubscription;
@@ -16,6 +17,8 @@ Route::post('/v1/login', [AuthController::class, 'login'])->withoutMiddleware([C
 Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::apiResource('products', ProductController::class);
     Route::apiResource('sales', SaleController::class);

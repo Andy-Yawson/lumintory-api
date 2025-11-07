@@ -39,11 +39,11 @@ class DashboardController extends Controller
                 ->whereDate('return_date', $today)
                 ->sum('refund_amount');
 
+            $tenant = \App\Models\Tenant::find($tenantId);
+            $threshold = $tenant?->settings['low_stock_threshold'] ?? 10;
+
             $lowStockCount = Product::where('tenant_id', $tenantId)
-                ->where('quantity', '<', function ($q) use ($tenantId) {
-                    $threshold = \App\Models\Tenant::find($tenantId)->settings['low_stock_threshold'] ?? 10;
-                    $q->select('low_stock_threshold')->from('tenants')->where('id', $tenantId);
-                })
+                ->where('quantity', '<', $threshold)
                 ->count();
 
             $topProduct = Sale::where('tenant_id', $tenantId)
@@ -52,6 +52,36 @@ class DashboardController extends Controller
                 ->groupBy('product_id')
                 ->orderByDesc('total_sold')
                 ->first();
+
+
+            // === GRAPH DATA (Sales vs Returns - last 7 days) ===
+            $startDate = now()->subDays(6); // include today + 6 previous days
+            $endDate = now();
+
+            $salesData = Sale::where('tenant_id', $tenantId)
+                ->whereBetween('sale_date', [$startDate, $endDate])
+                ->selectRaw('DATE(sale_date) as date, SUM(total_amount) as total_sales')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
+
+            $returnsData = ReturnItem::where('tenant_id', $tenantId)
+                ->whereBetween('return_date', [$startDate, $endDate])
+                ->selectRaw('DATE(return_date) as date, SUM(refund_amount) as total_returns')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
+
+            // Merge sales & returns data into one array by date
+            $dates = collect();
+            for ($i = 6; $i >= 0; $i--) {
+                $date = now()->subDays($i)->format('Y-m-d');
+                $dates->push([
+                    'date' => $date,
+                    'sales' => (float) ($salesData->firstWhere('date', $date)->total_sales ?? 0),
+                    'returns' => (float) ($returnsData->firstWhere('date', $date)->total_returns ?? 0),
+                ]);
+            }
 
             return response()->json([
                 'total_products' => $totalProducts,
@@ -64,6 +94,7 @@ class DashboardController extends Controller
                 'top_product_sold' => $topProduct?->total_sold ?? 0,
                 'currency' => Auth::user()->tenant->settings['currency'] ?? 'GHS',
                 'generated_at' => now()->format('Y-m-d H:i'),
+                'graph' => $dates,
             ]);
         });
     }

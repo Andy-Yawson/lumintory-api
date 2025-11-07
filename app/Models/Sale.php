@@ -84,4 +84,9 @@ class Sale extends Model
     {
         return $this->product?->getVariationPrice($this->color) ?? $this->unit_price;
     }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
 }

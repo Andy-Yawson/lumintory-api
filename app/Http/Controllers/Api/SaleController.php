@@ -14,13 +14,38 @@ class SaleController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return Sale::with(['product', 'customer'])
+        $perPage = $request->get('per_page', 20);
+        $search = $request->get('search');
+
+        $query = Sale::with(['product', 'customer'])
             ->where('tenant_id', Auth::user()->tenant_id)
-            ->orderByDesc('sale_date')
-            ->paginate(20);
+            ->orderByDesc('sale_date');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('notes', 'like', "%{$search}%")
+                    ->orWhereHas('product', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('customer', function ($q3) use ($search) {
+                        $q3->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $sales = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $sales->items(),
+            'current_page' => $sales->currentPage(),
+            'last_page' => $sales->lastPage(),
+            'total' => $sales->total(),
+            'per_page' => $sales->perPage(),
+        ]);
     }
+
 
     /**
      * Store a newly created resource in storage.
@@ -34,7 +59,7 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
             'unit_price' => 'required|numeric',
             'notes' => 'nullable|string',
-            'sale_date' => 'required|date',
+            // 'sale_date' => 'required|date',
         ]);
 
         $product = Product::findOrFail($data['product_id']);
@@ -47,6 +72,7 @@ class SaleController extends Controller
 
         $data['total_amount'] = $data['quantity'] * $data['unit_price'];
         $data['tenant_id'] = Auth::user()->tenant_id;
+        $data['sale_date'] = now();
 
         $sale = Sale::create($data);
 

@@ -14,8 +14,7 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
 
-        $query = Product::where('tenant_id', Auth::user()->tenant_id)
-            ->with('variations');
+        $query = Product::where('tenant_id', Auth::user()->tenant_id);
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
