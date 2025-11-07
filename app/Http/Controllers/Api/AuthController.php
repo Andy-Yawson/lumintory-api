@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -47,6 +49,10 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials', 'success' => false], 404);
         }
 
+        if (! $user->tenant->is_active) {
+            return response()->json(['message' => 'Subscription inactive. Please renew.'], 403);
+        }
+
         // Delete old tokens if needed
         $user->tokens()->delete();
 
@@ -61,6 +67,7 @@ class AuthController extends Controller
     }
 
 
+
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -70,5 +77,94 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         return $request->user()->load('tenant');
+    }
+
+    public function registerTenant(Request $request)
+    {
+        $validated = $request->validate([
+            'tenant_name' => 'required|string|max:255',
+            'user_name'   => 'required|string|max:255',
+            'email'       => 'required|email|unique:users,email',
+            'password'    => 'required|string|min:6',
+        ]);
+
+        $tenant = Tenant::create([
+            'name' => $validated['tenant_name'],
+            'domain' => null,
+            'plan' => 'free',
+            'is_active' => false,
+        ]);
+
+        $user = User::create([
+            'name' => $validated['user_name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'tenant_id' => $tenant->id,
+            'role' => 'Administrator',
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Tenant registered successfully. Please activate subscription.',
+            'tenant' => $tenant,
+            'user' => $user,
+            'token' => $token,
+        ], 201);
+    }
+
+    public function activateSubscription(Request $request)
+    {
+        $validated = $request->validate([
+            'tenant_id' => 'required|exists:tenants,id',
+            'plan' => 'required|in:monthly,yearly',
+        ]);
+
+        $tenant = Tenant::findOrFail($validated['tenant_id']);
+        $tenant->plan = $validated['plan'];
+        $tenant->subscription_ends_at = $validated['plan'] === 'monthly'
+            ? now()->addMonth()
+            : now()->addYear();
+        $tenant->is_active = true;
+        $tenant->save();
+
+        return response()->json([
+            'message' => 'Subscription activated successfully.',
+            'tenant' => $tenant,
+        ]);
+    }
+
+    public function addUser(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'role' => 'required|in:Administrator,Sales',
+        ]);
+
+        $tenantId = Auth::user()->tenant_id;
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'tenant_id' => $tenantId,
+            'role' => $validated['role'],
+        ]);
+
+        return response()->json([
+            'message' => 'User added successfully.',
+            'user' => $user,
+        ], 201);
+    }
+
+
+    public function listUsers()
+    {
+        $tenantId = Auth::user()->tenant_id;
+        $users = User::where('tenant_id', $tenantId)->get();
+
+        return response()->json($users);
     }
 }

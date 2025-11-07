@@ -13,10 +13,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/v1/register', [AuthController::class, 'register'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/login', [AuthController::class, 'login'])->withoutMiddleware([CheckTenantSubscription::class]);
+Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->withoutMiddleware([CheckTenantSubscription::class]);
+Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription'])->withoutMiddleware([CheckTenantSubscription::class]);
 
 Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/add-user', [AuthController::class, 'addUser']);
+    Route::get('/users', [AuthController::class, 'listUsers']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 

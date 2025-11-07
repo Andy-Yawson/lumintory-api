@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->foreignId('tenant_id')->constrained()->onDelete('cascade');
+            $table->enum('role', ['Administrator', 'Sales'])->default('Administrator');
             $table->rememberToken();
             $table->timestamps();
         });
