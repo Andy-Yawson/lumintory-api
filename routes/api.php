@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/v1/register', [AuthController::class, 'register'])->withoutMiddleware([CheckTenantSubscription::class]);
+// Route::post('/v1/register', [AuthController::class, 'register'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/login', [AuthController::class, 'login'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription'])->withoutMiddleware([CheckTenantSubscription::class]);

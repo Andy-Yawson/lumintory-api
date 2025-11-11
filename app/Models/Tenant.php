@@ -13,6 +13,7 @@ class Tenant extends Model
         'name',
         'domain',
         'settings',
+        'subscription_ends_at'
     ];
 
     protected $casts = [

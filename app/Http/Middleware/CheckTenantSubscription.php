@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ class CheckTenantSubscription
             return response()->json([
                 'error' => 'Subscription expired',
                 'message' => 'Please renew your plan to continue using Lumintory.',
-                'expired_at' => $tenant->subscription_ends_at?->format('Y-m-d'),
+                'expired_at' => Carbon::parse($tenant->subscription_ends_at)->format('Y-m-d'),
                 'plan' => $tenant->plan,
                 'success' => false
             ], 403);

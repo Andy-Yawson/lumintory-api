@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
@@ -92,7 +93,8 @@ class AuthController extends Controller
             'name' => $validated['tenant_name'],
             'domain' => null,
             'plan' => 'free',
-            'is_active' => false,
+            'is_active' => true,
+            'subscription_ends_at' => Carbon::now()->addYear()
         ]);
 
         $user = User::create([
