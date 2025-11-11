@@ -19,10 +19,13 @@ class ReturnItem extends Model
         'refund_amount',
         'reason',
         'return_date',
+        'variation',
+        'customer_id'
     ];
 
     protected $casts = [
         'return_date' => 'date',
+        'variation' => 'array',
     ];
 
     // === TENANT SCOPING ===

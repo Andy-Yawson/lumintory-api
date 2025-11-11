@@ -20,10 +20,13 @@ class Sale extends Model
         'total_amount',
         'notes',
         'sale_date',
+        'variation',
+        'customer_id'
     ];
 
     protected $casts = [
         'sale_date' => 'date',
+        'variation' => 'array',
     ];
 
     // === TENANT SCOPING ===
@@ -82,8 +85,14 @@ class Sale extends Model
     // === ACCESSORS ===
     public function getVariationPrice()
     {
-        return $this->product?->getVariationPrice($this->color) ?? $this->unit_price;
+        if (!$this->variation || !is_array($this->variation)) {
+            return $this->unit_price;
+        }
+
+        $variationValue = $this->variation['value'] ?? null;
+        return $this->product?->getVariationPrice($variationValue) ?? $this->unit_price;
     }
+
 
     public function customer()
     {

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->onDelete('cascade');
             $table->foreignId('sale_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
+            $table->json('variation')->nullable();
             $table->string('color')->nullable();
             $table->integer('quantity');
             $table->decimal('refund_amount', 10, 2);

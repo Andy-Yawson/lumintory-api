@@ -51,9 +51,16 @@ class Product extends Model
         return $this->quantity < $threshold;
     }
 
-    public function getVariationPrice($color)
+    public function getVariationPrice($value)
     {
-        $variation = collect($this->variations)->firstWhere('color', strtolower($color));
+        if (!$this->variations || !is_array($this->variations)) {
+            return $this->unit_price;
+        }
+
+        $variation = collect($this->variations)->first(function ($v) use ($value) {
+            return strtolower($v['value'] ?? '') === strtolower($value);
+        });
+
         return $variation['price'] ?? $this->unit_price;
     }
 }

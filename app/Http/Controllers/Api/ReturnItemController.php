@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ReturnItem;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,7 +28,7 @@ class ReturnItemController extends Controller
             'return_date' => 'required|date',
         ]);
 
-        $sale = \App\Models\Sale::findOrFail($data['sale_id']);
+        $sale = Sale::findOrFail($data['sale_id']);
         $this->authorizeTenant($sale);
 
         if ($data['quantity'] > $sale->quantity) {
@@ -36,7 +37,8 @@ class ReturnItemController extends Controller
 
         $data['tenant_id'] = Auth::user()->tenant_id;
         $data['product_id'] = $sale->product_id;
-        $data['color'] = $sale->color;
+        $data['variation'] = $sale->variation;
+        $data['customer_id'] = $sale->customer_id;
 
         $return = ReturnItem::create($data);
 

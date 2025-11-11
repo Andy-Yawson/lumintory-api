@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Sale;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -47,32 +48,29 @@ class SaleController extends Controller
     }
 
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
             'product_id' => 'required|exists:products,id',
             'customer_id' => 'nullable|exists:customers,id',
-            'color' => 'nullable|string',
             'quantity' => 'required|integer|min:1',
             'unit_price' => 'required|numeric',
             'notes' => 'nullable|string',
-            // 'sale_date' => 'required|date',
+            'sale_date' => 'nullable|date',
+            'variation' => 'nullable|array'
         ]);
 
         $product = Product::findOrFail($data['product_id']);
         $this->authorizeTenant($product);
 
-        // Override price from variation if color provided
-        if ($data['color']) {
-            $data['unit_price'] = $product->getVariationPrice($data['color']);
+        // Override price from variation if provided
+        if (!empty($data['variation']['value'])) {
+            $data['unit_price'] = $product->getVariationPrice($data['variation']['value']);
         }
 
         $data['total_amount'] = $data['quantity'] * $data['unit_price'];
         $data['tenant_id'] = Auth::user()->tenant_id;
-        $data['sale_date'] = now();
+        $data['sale_date'] = is_null($data["sale_date"]) ? now() : Carbon::parse($data["sale_date"]);
 
         $sale = Sale::create($data);
 
