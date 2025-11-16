@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Referral;
 use App\Models\Tenant;
+use App\Models\TenantToken;
+use App\Models\TokenTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
@@ -85,8 +88,10 @@ class AuthController extends Controller
             'user_name'   => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email',
             'password'    => 'required|string|min:6',
+            'ref' => 'nullable|string',
         ]);
 
+        // Create tenant
         $tenant = Tenant::create([
             'name' => $validated['tenant_name'],
             'domain' => null,
@@ -95,6 +100,7 @@ class AuthController extends Controller
             'subscription_ends_at' => Carbon::now()->addYear()
         ]);
 
+        // Create user
         $user = User::create([
             'name' => $validated['user_name'],
             'email' => $validated['email'],
@@ -102,6 +108,41 @@ class AuthController extends Controller
             'tenant_id' => $tenant->id,
             'role' => 'Administrator',
         ]);
+
+        // ----------- REFERRAL ------------
+        if (!empty($validated['ref'])) {
+            $referrerTenant = Tenant::where('referral_code', $validated['ref'])->first();
+
+            if ($referrerTenant && $referrerTenant->id !== $tenant->id) {
+
+                $tenant->referred_by_tenant_id = $referrerTenant->id;
+                $tenant->save();
+
+                $tokensToAward = config('rewards.referral_token_reward', 20);
+
+                TokenTransaction::create([
+                    'tenant_id' => $referrerTenant->id,
+                    'amount' => $tokensToAward,
+                    'type' => 'earn',
+                    'source' => 'referral',
+                    'meta' => [
+                        'referred_tenant_id' => $tenant->id,
+                    ],
+                ]);
+
+                $tt = TenantToken::where('tenant_id', $referrerTenant->id)->first();
+                $tt->update([
+                    'balance' => $tt->balance + $tokensToAward
+                ]);
+
+                Referral::create([
+                    'referrer_tenant_id' => $referrerTenant->id,
+                    'referred_tenant_id' => $tenant->id,
+                    'tokens_awarded' => $tokensToAward,
+                ]);
+            }
+        }
+        // ------------------------------------------------
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -112,6 +153,7 @@ class AuthController extends Controller
             'token' => $token,
         ], 201);
     }
+
 
     public function activateSubscription(Request $request)
     {

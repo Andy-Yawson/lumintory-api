@@ -13,7 +13,9 @@ class Tenant extends Model
         'name',
         'domain',
         'settings',
-        'subscription_ends_at'
+        'subscription_ends_at',
+        'referral_code',
+        'referred_by_tenant_id',
     ];
 
     protected $casts = [
@@ -39,5 +41,35 @@ class Tenant extends Model
     public function customers()
     {
         return $this->hasMany(Customer::class);
+    }
+
+    public function referrer()
+    {
+        return $this->belongsTo(Tenant::class, 'referred_by_tenant_id');
+    }
+
+    public function referrals()
+    {
+        return $this->hasMany(Referral::class, 'referrer_tenant_id');
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($tenant) {
+            if (empty($tenant->referral_code)) {
+                $tenant->referral_code = self::generateUniqueReferralCode();
+            }
+        });
+    }
+
+    protected static function generateUniqueReferralCode()
+    {
+        do {
+            $code = strtoupper(str()->random(8));
+        } while (self::where('referral_code', $code)->exists());
+
+        return $code;
     }
 }

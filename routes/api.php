@@ -41,4 +41,5 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     Route::post('/rewards/daily-login', [TokenController::class, 'dailyLogin']);
     Route::post('/rewards/redeem-sms', [TokenController::class, 'redeemSMS']);
     Route::get('/rewards/summary', [TokenController::class, 'summary']);
+    Route::get('/rewards/referrals', [TokenController::class, 'referrals']);
 });

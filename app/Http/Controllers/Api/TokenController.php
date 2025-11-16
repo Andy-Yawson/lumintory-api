@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyLoginReward;
+use App\Models\Referral;
 use App\Models\SmsCredit;
 use App\Models\TenantToken;
 use App\Services\TokenService;
@@ -77,6 +78,24 @@ class TokenController extends Controller
             'tokens' => $token->balance,
             'sms_credits' => $sms->credits,
             'claimed_today' => $claimedToday,
+        ]);
+    }
+
+    public function referrals()
+    {
+        $tenant = Auth::user()->tenant;
+
+        $referrals = Referral::with('referredTenant')
+            ->where('referrer_tenant_id', $tenant->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'referral_code' => $tenant->referral_code,
+            'referral_link' => url('/register?ref=' . $tenant->referral_code),
+            'referrals' => $referrals,
+            'referrals_count' => $referrals->count(),
+            'tokens_from_referrals' => $referrals->sum('tokens_awarded'),
         ]);
     }
 }
