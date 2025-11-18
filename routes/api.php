@@ -8,8 +8,10 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\StoreConnectionController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\WebhookController;
 use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
@@ -47,4 +49,15 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
+
+    Route::get('stores', [StoreConnectionController::class, 'index']);
+    Route::post('stores', [StoreConnectionController::class, 'store']);
+    Route::delete('stores/{id}', [StoreConnectionController::class, 'destroy']);
+    Route::post('stores/{id}/test', [StoreConnectionController::class, 'testConnection']);
+    Route::get('stores/{id}/logs', [StoreConnectionController::class, 'logs']);
+    Route::post('/stores/{store}/sync-products', [StoreConnectionController::class, 'syncProducts']);
+
+    // Public webhooks - no auth (provider calls this)
+    Route::post('webhooks/{provider}/{connectionId}', [WebhookController::class, 'handle']);
+
 });
