@@ -6,13 +6,14 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\ReturnItemController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
-// Route::post('/v1/register', [AuthController::class, 'register'])->withoutMiddleware([CheckTenantSubscription::class]);
+
 Route::post('/v1/login', [AuthController::class, 'login'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->withoutMiddleware([CheckTenantSubscription::class]);
 Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription'])->withoutMiddleware([CheckTenantSubscription::class]);
@@ -42,4 +43,8 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     Route::post('/rewards/redeem-sms', [TokenController::class, 'redeemSMS']);
     Route::get('/rewards/summary', [TokenController::class, 'summary']);
     Route::get('/rewards/referrals', [TokenController::class, 'referrals']);
+
+    //----- Forecast Model ------
+    Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
+    Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
 });

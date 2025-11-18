@@ -16,6 +16,7 @@ class Tenant extends Model
         'subscription_ends_at',
         'referral_code',
         'referred_by_tenant_id',
+        'is_active'
     ];
 
     protected $casts = [

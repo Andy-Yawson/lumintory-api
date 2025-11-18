@@ -63,4 +63,14 @@ class Product extends Model
 
         return $variation['price'] ?? $this->unit_price;
     }
+
+    public function forecasts()
+    {
+        return $this->hasMany(ProductForecast::class);
+    }
+
+    public function latestForecast()
+    {
+        return $this->hasOne(ProductForecast::class)->latestOfMany('forecasted_at');
+    }
 }
