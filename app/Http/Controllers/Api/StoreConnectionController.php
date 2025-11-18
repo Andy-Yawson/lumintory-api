@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RegisterShopWebhooksJob;
 use App\Models\StoreConnection;
 use App\Services\Ecommerce\StoreSyncFactory;
 use Illuminate\Http\Request;
