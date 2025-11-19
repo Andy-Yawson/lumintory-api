@@ -11,17 +11,18 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
 
-Route::post('/v1/login', [AuthController::class, 'login'])->withoutMiddleware([CheckTenantSubscription::class]);
-Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->withoutMiddleware([CheckTenantSubscription::class]);
-Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription'])->withoutMiddleware([CheckTenantSubscription::class]);
+Route::post('/v1/login', [AuthController::class, 'login']);
+Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant']);
+Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
 
-Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(function () {
+Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/add-user', [AuthController::class, 'addUser']);
@@ -29,13 +30,13 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    Route::apiResource('products', ProductController::class);
+    Route::apiResource('products', ProductController::class)->middleware('plan.limits:products');
     Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('/products/import', [ProductController::class, 'import']);
 
     Route::apiResource('sales', SaleController::class);
     Route::apiResource('returns', ReturnItemController::class);
-    Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('customers', CustomerController::class)->middleware('plan.limits:customers');
 
     Route::get('/reports/sales', [ReportController::class, 'sales']);
     Route::get('/reports/stock', [ReportController::class, 'stock']);
@@ -50,6 +51,8 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     Route::get('/rewards/summary', [TokenController::class, 'summary']);
     Route::get('/rewards/referrals', [TokenController::class, 'referrals']);
 
+    Route::post('/sms/send', [SmsController::class, 'send'])->middleware('sms.credits');
+
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
@@ -63,7 +66,7 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
 });
 
 // ------ Custom API Produuct and Order sync ------
-Route::prefix('integrations')->middleware('integration.auth')->group(function () {
+Route::prefix('v1/integrations')->middleware('integration.auth')->group(function () {
     // Products
     Route::get('/products', [IntegrationProductController::class, 'index'])->middleware('integration.auth:products:read');
     Route::post('/products/sync', [IntegrationProductController::class, 'sync'])->middleware('integration.auth:products:write');

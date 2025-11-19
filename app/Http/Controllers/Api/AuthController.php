@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Referral;
+use App\Models\SmsCredit;
 use App\Models\Tenant;
 use App\Models\TenantToken;
 use App\Models\TokenTransaction;
@@ -53,7 +54,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials', 'success' => false], 404);
         }
 
-        if (! $user->tenant->is_active) {
+        if (!$user->tenant->is_active) {
             return response()->json(['message' => 'Subscription inactive. Please renew.'], 403);
         }
 
@@ -85,9 +86,9 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'tenant_name' => 'required|string|max:255',
-            'user_name'   => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email',
-            'password'    => 'required|string|min:6',
+            'user_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
             'ref' => 'nullable|string',
         ]);
 
@@ -95,9 +96,17 @@ class AuthController extends Controller
         $tenant = Tenant::create([
             'name' => $validated['tenant_name'],
             'domain' => null,
-            'plan' => 'free',
+            'plan' => 'basic',
             'is_active' => true,
             'subscription_ends_at' => Carbon::now()->addYear()
+        ]);
+
+        $planLimits = config("plan_limits.{$tenant->plan}", []);
+        $initialSms = $planLimits['sms'] ?? 0;
+
+        SmsCredit::create([
+            'tenant_id' => $tenant->id,
+            'credits' => $initialSms,
         ]);
 
         // Create user

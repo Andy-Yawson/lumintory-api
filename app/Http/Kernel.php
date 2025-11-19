@@ -2,8 +2,6 @@
 
 namespace App\Http;
 
-use App\Http\Middleware\CheckTenantSubscription;
-use App\Http\Middleware\IntegrationApiAuth;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 
 class Kernel extends HttpKernel
@@ -44,7 +42,6 @@ class Kernel extends HttpKernel
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            CheckTenantSubscription::class,
         ],
     ];
 
@@ -67,7 +64,10 @@ class Kernel extends HttpKernel
         'signed' => \App\Http\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-        'subscription' => CheckTenantSubscription::class,
-        'integration.auth' => IntegrationApiAuth::class,
+
+        'integration.auth' => \App\Http\Middleware\IntegrationApiAuth::class,
+        'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
+        'sms.credits' => \App\Http\Middleware\CheckSmsCredits::class,
+
     ];
 }

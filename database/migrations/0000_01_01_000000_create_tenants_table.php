@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -13,10 +12,11 @@ return new class extends Migration
     {
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
+            $table->string('external_id')->nullable();
             $table->string('name');
-            $table->string('domain')->unique()->nullable(); // For future subdomain (e.g., kingstar.lumintory.app)
+            $table->string('domain')->unique()->nullable();
             $table->json('settings')->nullable();
-            $table->enum('plan', ['free', 'monthly', 'yearly'])->default('free');
+            $table->enum('plan', ['basic', 'pro', 'custom'])->default('basic');
             $table->date('subscription_ends_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
