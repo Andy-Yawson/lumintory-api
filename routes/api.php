@@ -27,6 +27,9 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::apiResource('products', ProductController::class);
+    Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
+    Route::post('/products/import', [ProductController::class, 'import']);
+
     Route::apiResource('sales', SaleController::class);
     Route::apiResource('returns', ReturnItemController::class);
     Route::apiResource('customers', CustomerController::class);

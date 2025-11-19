@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\ProductTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Imports\ProductsImport;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
@@ -87,6 +90,28 @@ class ProductController extends Controller
         $this->authorizeProduct($product);
         $product->delete();
         return response()->json(null, 204);
+    }
+
+    public function downloadTemplate()
+    {
+        $fileName = 'product_import_template.xlsx';
+        return Excel::download(new ProductTemplateExport, $fileName);
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+        ]);
+
+        $tenantId = Auth::user()->tenant_id;
+
+        // Let’s pass tenant id into the import class
+        Excel::import(new ProductsImport($tenantId), $request->file('file'));
+
+        return response()->json([
+            'message' => 'Products imported successfully',
+        ]);
     }
 
 
