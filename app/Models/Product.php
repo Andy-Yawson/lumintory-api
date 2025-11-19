@@ -19,6 +19,8 @@ class Product extends Model
         'unit_price',
         'variations',
         'description',
+        'external_id',
+        'sku',
     ];
 
     protected $casts = [

@@ -3,6 +3,7 @@
 namespace App\Http;
 
 use App\Http\Middleware\CheckTenantSubscription;
+use App\Http\Middleware\IntegrationApiAuth;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 
 class Kernel extends HttpKernel
@@ -67,5 +68,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'subscription' => CheckTenantSubscription::class,
+        'integration.auth' => IntegrationApiAuth::class,
     ];
 }

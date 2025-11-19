@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\IntegrationApiKeyController;
+use App\Http\Controllers\Api\IntegrationOrderController;
+use App\Http\Controllers\Api\IntegrationProductController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\ReturnItemController;
@@ -50,4 +53,21 @@ Route::middleware(['auth:sanctum', 'subscription'])->prefix('v1')->group(functio
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
+
+    //----- Custom Integration Keys ------
+    Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);
+    Route::post('/integration-keys', [IntegrationApiKeyController::class, 'store']);
+    Route::put('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'update']);
+    Route::delete('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'destroy']);
+
+});
+
+// ------ Custom API Produuct and Order sync ------
+Route::prefix('integrations')->middleware('integration.auth')->group(function () {
+    // Products
+    Route::get('/products', [IntegrationProductController::class, 'index'])->middleware('integration.auth:products:read');
+    Route::post('/products/sync', [IntegrationProductController::class, 'sync'])->middleware('integration.auth:products:write');
+
+    // Orders
+    Route::post('/orders/sync', [IntegrationOrderController::class, 'sync'])->middleware('integration.auth:orders:write');
 });
