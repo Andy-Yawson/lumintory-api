@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/rewards/referrals', [TokenController::class, 'referrals']);
 
     Route::post('/sms/send', [SmsController::class, 'send'])->middleware('sms.credits');
+    Route::post('/sms/send-bulk', [SmsController::class, 'sendBulk'])->middleware('sms.credits');
 
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
