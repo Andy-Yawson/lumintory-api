@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
 use App\Http\Controllers\Api\IntegrationProductController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\ReturnItemController;
@@ -20,13 +21,18 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/v1/login', [AuthController::class, 'login']);
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant']);
-Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
+
+Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestReset']);
+Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
+
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/add-user', [AuthController::class, 'addUser']);
     Route::get('/users', [AuthController::class, 'listUsers']);
+    Route::post('/password/change', [AuthController::class, 'changePassword']);
+    Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
