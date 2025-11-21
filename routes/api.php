@@ -53,6 +53,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::post('/sms/send', [SmsController::class, 'send'])->middleware('sms.credits');
     Route::post('/sms/send-bulk', [SmsController::class, 'sendBulk'])->middleware('sms.credits');
+    Route::get('/sms/credits', [SmsController::class, 'getSMSCredit'])->middleware('sms.credits');
 
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\SmsCredit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -39,7 +40,6 @@ class SmsController extends Controller
             'remaining_credits' => $smsCredit->fresh()->credits,
         ]);
     }
-
 
     public function sendBulk(Request $request)
     {
@@ -124,5 +124,11 @@ class SmsController extends Controller
             'charged_sms' => $effectiveSmsCount,
             'remaining_credits' => $smsCredit->fresh()->credits,
         ]);
+    }
+
+    public function getSMSCredit(Request $request)
+    {
+        $credit = SmsCredit::where('tenant_id', Auth::user()->tenant->id)->first();
+        return response()->json(['credits' => $credit->credits]);
     }
 }
