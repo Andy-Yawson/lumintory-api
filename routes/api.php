@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
@@ -64,6 +65,9 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
+
+    Route::get('/audit/logs', [AuditLogController::class, 'index'])->middleware('pro.tenant');
+    Route::get('/audit/stats', [AuditLogController::class, 'stats'])->middleware('pro.tenant');
 
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);

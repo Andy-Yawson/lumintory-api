@@ -42,6 +42,7 @@ class Kernel extends HttpKernel
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\AuditLogMiddleware::class,
         ],
     ];
 
@@ -68,6 +69,7 @@ class Kernel extends HttpKernel
         'integration.auth' => \App\Http\Middleware\IntegrationApiAuth::class,
         'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
         'sms.credits' => \App\Http\Middleware\CheckSmsCredits::class,
+        'pro.tenant' => \App\Http\Middleware\EnsureProTenant::class,
 
     ];
 }
