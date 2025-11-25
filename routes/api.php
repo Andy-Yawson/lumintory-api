@@ -30,25 +30,26 @@ Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPasswor
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
-    Route::post('/add-user', [AuthController::class, 'addUser']);
+    Route::post('/add-user', [AuthController::class, 'addUser'])->middleware('limit.users');
     Route::get('/users', [AuthController::class, 'listUsers']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
     Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    Route::apiResource('products', ProductController::class)->middleware('plan.limits:products');
+    Route::apiResource('products', ProductController::class)->middleware('limit.products');
     Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('/products/import', [ProductController::class, 'import']);
 
-    Route::apiResource('sales', SaleController::class);
-    Route::apiResource('returns', ReturnItemController::class);
-    Route::apiResource('customers', CustomerController::class)->middleware('plan.limits:customers');
+    Route::apiResource('sales', SaleController::class)->middleware('limit.sales');
+    Route::apiResource('returns', ReturnItemController::class)->middleware('limit.returns');
+    Route::apiResource('customers', CustomerController::class)->middleware('limit.customers');
 
     Route::get('/reports/sales', [ReportController::class, 'sales']);
     Route::get('/reports/stock', [ReportController::class, 'stock']);
     Route::get('/reports/top-products', [ReportController::class, 'topProducts']);
     Route::get('/reports/returns', [ReportController::class, 'returns']);
+    Route::get('/reports/usage', [ReportController::class, 'index']);
 
     Route::post('/subscription', [SubscriptionController::class, 'update']);
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt']);
@@ -58,16 +59,16 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/rewards/summary', [TokenController::class, 'summary']);
     Route::get('/rewards/referrals', [TokenController::class, 'referrals']);
 
-    Route::post('/sms/send', [SmsController::class, 'send'])->middleware('sms.credits');
-    Route::post('/sms/send-bulk', [SmsController::class, 'sendBulk'])->middleware('sms.credits');
-    Route::get('/sms/credits', [SmsController::class, 'getSMSCredit'])->middleware('sms.credits');
+    Route::post('/sms/send', [SmsController::class, 'send'])->middleware('limit.sms');
+    Route::post('/sms/send-bulk', [SmsController::class, 'sendBulk'])->middleware('limit.sms');
+    Route::get('/sms/credits', [SmsController::class, 'getSMSCredit']);
 
     //----- Forecast Model ------
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
 
-    Route::get('/audit/logs', [AuditLogController::class, 'index'])->middleware('pro.tenant');
-    Route::get('/audit/stats', [AuditLogController::class, 'stats'])->middleware('pro.tenant');
+    Route::get('/audit/logs', [AuditLogController::class, 'index']);
+    Route::get('/audit/stats', [AuditLogController::class, 'stats']);
 
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);

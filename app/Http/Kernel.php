@@ -67,9 +67,12 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
         'integration.auth' => \App\Http\Middleware\IntegrationApiAuth::class,
-        'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
-        'sms.credits' => \App\Http\Middleware\CheckSmsCredits::class,
-        'pro.tenant' => \App\Http\Middleware\EnsureProTenant::class,
-
+        'limit.sms' => \App\Http\Middleware\CheckSmsCredits::class,
+        'limit.customers' => \App\Http\Middleware\EnsureCanCreateCustomer::class,
+        'limit.products' => \App\Http\Middleware\EnsureCanCreateProduct::class,
+        'limit.sales' => \App\Http\Middleware\EnsureCanRecordSale::class,
+        'limit.returns' => \App\Http\Middleware\EnsureCanRecordReturn::class,
+        'limit.users' => \App\Http\Middleware\EnsureCanCreateUser::class,
+        'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
     ];
 }

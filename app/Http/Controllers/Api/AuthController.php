@@ -102,7 +102,12 @@ class AuthController extends Controller
                 $tenant->referred_by_tenant_id = $referrerTenant->id;
                 $tenant->save();
 
-                $tokensToAward = config('rewards.referral_token_reward', 20);
+                $refTokenReward = $planLimits['referral'] ?? 'basic';
+                $tokensToAward = match ($refTokenReward) {
+                    'basic' => 5,
+                    'tiered' => 10,
+                    'custom' => 15,
+                };
 
                 TokenTransaction::create([
                     'tenant_id' => $referrerTenant->id,
