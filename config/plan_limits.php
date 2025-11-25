@@ -19,6 +19,7 @@ return [
         'data_retention_months' => 12,
         'support_level' => 'standard',
         'audit_logs' => false,
+        'support_tickets_per_month' => 3,
     ],
 
     'pro' => [
@@ -39,6 +40,7 @@ return [
         'data_retention_months' => 36,
         'support_level' => 'priority',
         'audit_logs' => true,
+        'support_tickets_per_month' => 30,
     ],
 
     'custom' => [
@@ -59,6 +61,7 @@ return [
         'data_retention_months' => null,
         'support_level' => 'vip',
         'audit_logs' => true,
+        'support_tickets_per_month' => null,
     ],
 ];
 

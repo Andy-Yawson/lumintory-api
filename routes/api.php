@@ -15,13 +15,14 @@ use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
 
 Route::post('/v1/login', [AuthController::class, 'login']);
-Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant']);
+Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
 
 Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestReset']);
 Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
@@ -69,6 +70,17 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('/audit/logs', [AuditLogController::class, 'index']);
     Route::get('/audit/stats', [AuditLogController::class, 'stats']);
+
+    // ------- Suppot Ticket -------
+    Route::get('/support-tickets/analytics', [SupportTicketController::class, 'analytics']);
+    Route::get('/support-tickets', [SupportTicketController::class, 'index']);
+    Route::get('/support-tickets/{ticket}', [SupportTicketController::class, 'show']);
+    Route::post('/support-tickets', [SupportTicketController::class, 'store'])->middleware('limit.ticket');
+    Route::post('/support-tickets/{ticket}/messages', [SupportTicketController::class, 'addMessage']);
+    Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
+
+
+
 
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);

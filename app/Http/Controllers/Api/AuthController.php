@@ -66,7 +66,16 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'ref' => 'nullable|string',
+            'website' => 'nullable|string|max:255',
         ]);
+
+        // If honeypot field is filled, silently reject
+        if (!empty($validated['website'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid submission.',
+            ], 422);
+        }
 
         // Create tenant
         $tenant = Tenant::create([

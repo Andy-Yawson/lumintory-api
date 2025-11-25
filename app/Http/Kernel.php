@@ -74,5 +74,6 @@ class Kernel extends HttpKernel
         'limit.returns' => \App\Http\Middleware\EnsureCanRecordReturn::class,
         'limit.users' => \App\Http\Middleware\EnsureCanCreateUser::class,
         'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
+        'limit.ticket' => \App\Http\Middleware\CheckSupportTicketLimit::class,
     ];
 }
