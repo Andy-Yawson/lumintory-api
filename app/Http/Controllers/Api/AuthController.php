@@ -8,6 +8,7 @@ use App\Models\SmsCredit;
 use App\Models\Tenant;
 use App\Models\TenantToken;
 use App\Models\TokenTransaction;
+use App\Services\PlanLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
@@ -76,8 +77,7 @@ class AuthController extends Controller
             'subscription_ends_at' => Carbon::now()->addYear()
         ]);
 
-        $planLimits = config("plan_limits.{$tenant->plan}", []);
-        $initialSms = $planLimits['sms'] ?? 0;
+        $initialSms = PlanLimit::getLimit($tenant, 'sms');
 
         SmsCredit::create([
             'tenant_id' => $tenant->id,

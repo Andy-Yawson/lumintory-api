@@ -10,7 +10,7 @@ class PlanLimit
     {
         $plan = strtolower($tenant->plan ?? 'basic');
 
-        return config("plan_limit.{$plan}", []);
+        return config("plan_limits.{$plan}", []);
     }
 
     public static function getLimit(Tenant $tenant, string $key, $default = null)
