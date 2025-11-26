@@ -139,4 +139,5 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fun
     Route::get('/backups', [AdminBackupController::class, 'index']);
     Route::post('/backups', [AdminBackupController::class, 'store']);
     Route::get('/backups/{backup}/download', [AdminBackupController::class, 'download']);
+
 });
