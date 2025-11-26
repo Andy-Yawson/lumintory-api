@@ -54,6 +54,11 @@ class Tenant extends Model
         return $this->hasMany(Referral::class, 'referrer_tenant_id');
     }
 
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
     protected static function boot()
     {
         parent::boot();
@@ -72,5 +77,10 @@ class Tenant extends Model
         } while (self::where('referral_code', $code)->exists());
 
         return $code;
+    }
+
+    public function subscriptionHistories()
+    {
+        return $this->hasMany(SubscriptionHistory::class);
     }
 }

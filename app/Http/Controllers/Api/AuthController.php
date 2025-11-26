@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Referral;
 use App\Models\SmsCredit;
+use App\Models\SubscriptionHistory;
 use App\Models\Tenant;
 use App\Models\TenantToken;
 use App\Models\TokenTransaction;
@@ -39,6 +40,10 @@ class AuthController extends Controller
 
         // Create new token
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        if ($user->tenant) {
+            $user->tenant->update(['last_active_at' => now()]);
+        }
 
         return response()->json([
             'user' => $user,
@@ -100,6 +105,19 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'tenant_id' => $tenant->id,
             'role' => 'Administrator',
+        ]);
+
+        SubscriptionHistory::create([
+            'tenant_id' => $tenant->id,
+            'from_plan' => null,
+            'to_plan' => $tenant->plan,
+            'event_type' => 'signup',
+            'amount' => null,
+            'currency' => 'GHS',
+            'effective_at' => now(),
+            'meta' => [
+                'source' => 'self_signup',
+            ],
         ]);
 
         // ----------- REFERRAL ------------

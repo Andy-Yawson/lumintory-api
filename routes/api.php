@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AdminAuditLogController;
+use App\Http\Controllers\Api\Admin\AdminBackupController;
+use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
+use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Api\Admin\AdminTenantController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
@@ -17,7 +22,6 @@ use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\TokenController;
-use App\Http\Middleware\CheckTenantSubscription;
 use Illuminate\Support\Facades\Route;
 
 
@@ -80,8 +84,6 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
 
 
-
-
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);
     Route::post('/integration-keys', [IntegrationApiKeyController::class, 'store']);
@@ -98,4 +100,43 @@ Route::prefix('v1/integrations')->middleware('integration.auth')->group(function
 
     // Orders
     Route::post('/orders/sync', [IntegrationOrderController::class, 'sync'])->middleware('integration.auth:orders:write');
+});
+
+
+Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(function () {
+    // Tenants
+    Route::get('/tenants', [AdminTenantController::class, 'index']);
+    Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show']);
+    Route::patch('/tenants/{tenant}', [AdminTenantController::class, 'update']);
+    Route::get('/tenants/{tenant}/usage', [AdminTenantController::class, 'usage']);
+
+    // Subscriptions (v1: summary + expiring)
+    Route::get('/subscriptions/summary', [AdminSubscriptionController::class, 'summary']);
+    Route::get('/subscriptions/tenants', [AdminSubscriptionController::class, 'tenants']);
+    Route::get('/subscriptions/history', [AdminSubscriptionController::class, 'history']);
+    Route::get('/subscriptions/history/tenant/{tenant}', [AdminSubscriptionController::class, 'historyByTenant']);
+    Route::get('/subscriptions/history/charts', [AdminSubscriptionController::class, 'charts']);
+
+    // Audit logs
+    Route::get('/audit-logs', [AdminAuditLogController::class, 'index']);
+    Route::get('/audit-logs/stats', [AdminAuditLogController::class, 'stats']);
+
+    // Support tickets
+    Route::get('/support/tickets', [AdminSupportTicketController::class, 'index']);
+    Route::get('/support/tickets/{ticket}', [AdminSupportTicketController::class, 'show']);
+    Route::post('/support/tickets/{ticket}/reply', [AdminSupportTicketController::class, 'reply']);
+    Route::post('/support/tickets/{ticket}/note', [AdminSupportTicketController::class, 'addInternalNote']);
+    Route::post('/support/tickets/{ticket}/status', [AdminSupportTicketController::class, 'updateStatus']);
+    Route::post('/support/tickets/{ticket}/assign', [AdminSupportTicketController::class, 'assign']);
+    // analytics endpoints for charts
+    Route::get('/support/analytics/overview', [AdminSupportTicketController::class, 'analyticsOverview']);
+    Route::get('/support/analytics/tickets-per-day', [AdminSupportTicketController::class, 'ticketsPerDay']);
+    Route::get('/support/analytics/by-category', [AdminSupportTicketController::class, 'ticketsByCategory']);
+    Route::get('/support/analytics/high-friction-tenants', [AdminSupportTicketController::class, 'highFrictionTenants']);
+
+
+    // Backups
+    Route::get('/backups', [AdminBackupController::class, 'index']);
+    Route::post('/backups', [AdminBackupController::class, 'store']);
+    Route::get('/backups/{backup}/download', [AdminBackupController::class, 'download']);
 });

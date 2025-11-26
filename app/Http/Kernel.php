@@ -75,5 +75,6 @@ class Kernel extends HttpKernel
         'limit.users' => \App\Http\Middleware\EnsureCanCreateUser::class,
         'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
         'limit.ticket' => \App\Http\Middleware\CheckSupportTicketLimit::class,
+        'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
     ];
 }
