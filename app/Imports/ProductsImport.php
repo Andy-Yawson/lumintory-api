@@ -11,10 +11,15 @@ use App\Models\Product;
 class ProductsImport implements ToCollection, WithHeadingRow
 {
     protected int $tenantId;
+    protected int $limit;
 
-    public function __construct(int $tenantId)
+    protected int $currentProductCount;
+
+    public function __construct(int $tenantId, int $limit)
     {
         $this->tenantId = $tenantId;
+        $this->limit = $limit;
+        $this->currentProductCount = Product::where('tenant_id', $this->tenantId)->count();
     }
 
     public function collection(Collection $rows)
@@ -22,6 +27,17 @@ class ProductsImport implements ToCollection, WithHeadingRow
         foreach ($rows as $row) {
             // Skip totally empty rows
             if (!$this->rowHasData($row)) {
+                continue;
+            }
+
+            // Check total product limit before creating each product
+            if ($this->limit !== null && $this->currentProductCount >= $this->limit) {
+                Log::warning('Product import skipped due to product limit', [
+                    'tenant_id' => $this->tenantId,
+                    'row' => $row,
+                    'max_products' => $this->limit,
+                ]);
+                // break;
                 continue;
             }
 
@@ -46,12 +62,13 @@ class ProductsImport implements ToCollection, WithHeadingRow
                     'size' => $row['size'] ?? null,
                     'variations' => $variations,
                 ]);
+
+                $this->currentProductCount++;
             } catch (\Throwable $e) {
                 Log::error('Product import failed for row', [
                     'row' => $row,
                     'error' => $e->getMessage(),
                 ]);
-                // You could also collect errors and return them if you want
             }
         }
     }

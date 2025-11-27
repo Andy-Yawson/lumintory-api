@@ -6,6 +6,7 @@ use App\Exports\ProductTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Imports\ProductsImport;
 use App\Models\Product;
+use App\Services\PlanLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -106,8 +107,36 @@ class ProductController extends Controller
 
         $tenantId = Auth::user()->tenant_id;
 
+        $limit = PlanLimit::getLimit(Auth::user()->tenant, 'products') ?? null;
+
+        if ($limit !== null) {
+            // Quick pre-read to count rows (excluding heading row)
+            $rowCount = Excel::toCollection(null, $request->file('file'))[0]
+                ->skip(1) // skip heading row
+                ->count();
+
+            if ($rowCount > $limit) {
+                return response()->json([
+                    'error' => true,
+                    'message' => "Your plan allows importing a maximum of {$limit} rows per file. You tried to import {$rowCount} rows.",
+                ], 422);
+            }
+        }
+
+
+        if ($limit !== null) {
+            $currentCount = Product::where('tenant_id', $tenantId)->count();
+
+            if ($currentCount >= $limit) {
+                return response()->json([
+                    'error' => true,
+                    'message' => "You have reached your product limit ({$limit}) for your current plan. Please delete some products or upgrade your plan.",
+                ], 422);
+            }
+        }
+
         // Let’s pass tenant id into the import class
-        Excel::import(new ProductsImport($tenantId), $request->file('file'));
+        Excel::import(new ProductsImport($tenantId, $limit), $request->file('file'));
 
         return response()->json([
             'message' => 'Products imported successfully',

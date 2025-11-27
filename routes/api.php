@@ -42,13 +42,19 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
-    Route::apiResource('products', ProductController::class)->middleware('limit.products');
+    Route::post('product', [ProductController::class, 'store'])->middleware('limit.products');
+    Route::apiResource('products', ProductController::class);
     Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('/products/import', [ProductController::class, 'import']);
 
-    Route::apiResource('sales', SaleController::class)->middleware('limit.sales');
-    Route::apiResource('returns', ReturnItemController::class)->middleware('limit.returns');
-    Route::apiResource('customers', CustomerController::class)->middleware('limit.customers');
+    Route::post('sales', [SaleController::class, 'store'])->middleware('limit.sales');
+    Route::apiResource('sales', SaleController::class);
+
+    Route::post('returns', [ReturnItemController::class, 'store'])->middleware('limit.returns');
+    Route::apiResource('returns', ReturnItemController::class);
+
+    Route::post('customers', [CustomerController::class, 'store'])->middleware('limit.customers');
+    Route::apiResource('customers', CustomerController::class);
 
     Route::get('/reports/sales', [ReportController::class, 'sales']);
     Route::get('/reports/stock', [ReportController::class, 'stock']);
@@ -139,5 +145,7 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fun
     Route::get('/backups', [AdminBackupController::class, 'index']);
     Route::post('/backups', [AdminBackupController::class, 'store']);
     Route::get('/backups/{backup}/download', [AdminBackupController::class, 'download']);
+
+    Route::post('/add-user', [AuthController::class, 'addUserAdmin']);
 
 });

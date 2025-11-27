@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -18,11 +17,8 @@ return new class extends Migration
             $table->string('size')->nullable();
             $table->integer('quantity')->default(0);
             $table->decimal('unit_price', 10, 2);
-
-            // For variations: silver, white, champagne, etc.
+            $table->string('sku')->nullable();
             $table->json('variations')->nullable();
-            // Example: [{"color": "silver", "price": 150.00}, {"color": "white", "price": 160.00}]
-
             $table->text('description')->nullable();
             $table->timestamps();
 

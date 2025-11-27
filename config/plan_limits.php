@@ -2,7 +2,7 @@
 
 return [
     'basic' => [
-        'products' => 100,
+        'products' => 5,
         'sales_per_month' => 1000,
         'returns_per_month' => 300,
         'customers' => 500,
@@ -23,7 +23,7 @@ return [
     ],
 
     'pro' => [
-        'products' => 5000,
+        'products' => 10,
         'sales_per_month' => 20000,
         'returns_per_month' => 5000,
         'customers' => 10000,

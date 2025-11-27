@@ -251,4 +251,29 @@ class AuthController extends Controller
             'success' => true,
         ]);
     }
+
+    public function addUserAdmin(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+        ]);
+
+        $tenantId = Auth::user()->tenant_id;
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'tenant_id' => $tenantId,
+            'role' => 'SuperAdmin',
+            'first_login' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'User added successfully.',
+            'user' => $user,
+        ], 201);
+    }
 }
