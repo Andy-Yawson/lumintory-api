@@ -12,6 +12,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Multitenancy\Jobs\NotTenantAware;
+use Spatie\DbDumper\Databases\MySql;
 
 class RunDatabaseBackupJob implements ShouldQueue, NotTenantAware
 {
@@ -19,17 +20,11 @@ class RunDatabaseBackupJob implements ShouldQueue, NotTenantAware
 
     public int $backupId;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(int $backupId)
     {
         $this->backupId = $backupId;
     }
 
-    /**
-     * Execute the job.
-     */
     public function handle(): void
     {
         $backup = Backup::find($this->backupId);
@@ -42,54 +37,36 @@ class RunDatabaseBackupJob implements ShouldQueue, NotTenantAware
         try {
             $diskName = $backup->disk ?? 'local';
             $disk = Storage::disk($diskName);
-
             $timestamp = now()->format('Y-m-d_H-i-s');
-            $fileName = "backups/db-backup-{$timestamp}.sql.gz";
+            $fileName = "backups/db-backup-{$timestamp}.sql";
 
-            // Ensure directory
             if (!$disk->exists('backups')) {
                 $disk->makeDirectory('backups');
             }
 
-            // TEMP file path
-            $localPath = storage_path("app/{$fileName}");
+            $tempPath = storage_path("app/temp-dump-{$timestamp}.sql");
 
-            // Build command using env variables
-            $dbHost = env('DB_HOST');
-            $dbPort = env('DB_PORT', 3306);
-            $dbName = env('DB_DATABASE');
-            $dbUser = env('DB_USERNAME');
-            $dbPass = env('DB_PASSWORD');
+            Log::info('Starting DB backup', [
+                'backup_id' => $this->backupId,
+                'temp_path' => $tempPath,
+                'disk' => $diskName,
+            ]);
 
-            // NOTE: make sure mysqldump is installed on your server
-            $command = sprintf(
-                'mysqldump -h%s -P%s -u%s -p%s %s | gzip > %s',
-                escapeshellarg($dbHost),
-                escapeshellarg($dbPort),
-                escapeshellarg($dbUser),
-                escapeshellarg($dbPass),
-                escapeshellarg($dbName),
-                escapeshellarg($localPath)
-            );
+            MySql::create()
+                ->setDbName(config('database.connections.mysql.database'))
+                ->setUserName(config('database.connections.mysql.username'))
+                ->setPassword(config('database.connections.mysql.password'))
+                ->setHost(config('database.connections.mysql.host'))
+                ->setPort(config('database.connections.mysql.port', 3306))
+                ->dumpToFile($tempPath);
 
-            // Run the command
-            $result = null;
-            $output = [];
-            exec($command, $output, $result);
-
-            if ($result !== 0) {
-                throw new Exception('mysqldump failed with code ' . $result);
+            if (!file_exists($tempPath)) {
+                throw new \Exception("Dump file was not created at {$tempPath}");
             }
 
-            // Move file into configured disk if not local
-            if ($diskName === 'local') {
-                // already in local disk path
-            } else {
-                $disk->put($fileName, file_get_contents($localPath));
-                @unlink($localPath);
-            }
+            $disk->put($fileName, file_get_contents($tempPath));
+            @unlink($tempPath);
 
-            // Get size
             $size = $disk->size($fileName);
 
             $backup->update([
@@ -97,7 +74,13 @@ class RunDatabaseBackupJob implements ShouldQueue, NotTenantAware
                 'size_bytes' => $size,
                 'status' => 'completed',
             ]);
-        } catch (Exception $e) {
+
+            Log::info('Database backup completed', [
+                'backup_id' => $this->backupId,
+                'path' => $fileName,
+                'size_bytes' => $size,
+            ]);
+        } catch (\Exception $e) {
             Log::error('Database backup failed', [
                 'backup_id' => $this->backupId,
                 'error' => $e->getMessage(),
@@ -112,4 +95,3 @@ class RunDatabaseBackupJob implements ShouldQueue, NotTenantAware
         }
     }
 }
-
