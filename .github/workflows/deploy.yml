@@ -1,0 +1,74 @@
+name: Deploy Zinnvy APIs to Test Environment
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+
+            echo "Marking the directory as safe for Git..."
+            sudo git config --global --add safe.directory /var/www/zinnvy-api-test
+
+
+            echo "Starting deployment..."
+            cd /var/www/zinnvy-api-test || { echo "Failed to navigate to project directory"; exit 1; }
+
+            echo "Pulling latest code..."
+            sudo git checkout develop
+            sudo git reset --hard
+            sudo -E env "GIT_SSH_COMMAND=ssh -i ${{ secrets.SSH_PRIVATE_KEY }}" git pull origin develop
+
+            echo "Installing composer dependencies..."
+            sudo composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+            echo "Migrating database..."
+            sudo php artisan migrate --force
+
+            echo "Database Seeding..."
+            sudo php artisan db:seed --force
+
+            echo "Linking storage..."
+            sudo php artisan storage:link || true
+
+            echo "Fixing file ownership and permissions..."
+            sudo chown -R ubuntu:www-data storage bootstrap/cache
+            sudo chmod -R ug+rwx storage bootstrap/cache storage/logs
+
+            echo "Clearing caches..."
+            sudo php artisan route:clear
+            sudo php artisan cache:clear || true
+            sudo php artisan config:clear
+
+            echo "Optimizing application..."
+            sudo php artisan optimize || true
+
+            sudo composer dump-autoload
+
+            echo "Restarting Laravel queues..."
+            sudo php artisan queue:restart
+
+            echo "Restarting Supervisor workers..."
+            sudo supervisorctl reread
+            sudo supervisorctl update
+            sudo supervisorctl restart all
+
+            sudo php artisan config:clear
+
+
+            echo "Deployment completed successfully!"
