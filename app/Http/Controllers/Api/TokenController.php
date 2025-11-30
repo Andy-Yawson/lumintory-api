@@ -61,7 +61,7 @@ class TokenController extends Controller
             return response()->json(['message' => 'Not enough tokens', 'success' => false], 422);
         }
 
-        return response()->json(['message' => 'SMS credits added successfully',  'success' => true]);
+        return response()->json(['message' => 'SMS credits added successfully', 'success' => true]);
     }
 
     public function summary()
@@ -92,7 +92,7 @@ class TokenController extends Controller
 
         return response()->json([
             'referral_code' => $tenant->referral_code,
-            'referral_link' => url('/register?ref=' . $tenant->referral_code),
+            'referral_link' => env('FRONTEND_URL') . '/register?ref=' . $tenant->referral_code,
             'referrals' => $referrals,
             'referrals_count' => $referrals->count(),
             'tokens_from_referrals' => $referrals->sum('tokens_awarded'),
