@@ -24,33 +24,48 @@ jobs:
             set -e
 
             echo "Determining target directory and branch..."
-            if [ "${GITHUB_REF##*/}" = "master" ]; then
+            # GITHUB_REF##*/ extracts the branch name (e.g., 'master' or 'develop')
+            GIT_BRANCH="${GITHUB_REF##*/}"
+            
+            if [ "$GIT_BRANCH" = "master" ]; then
               APP_DIR="/var/www/zinnvy-api"
-              GIT_BRANCH="master"
             else
+              # Catches 'develop' and any other push branch (e.g., if you added a feature branch)
               APP_DIR="/var/www/zinnvy-api-test"
-              GIT_BRANCH="develop"
             fi
 
             echo "Using app directory: $APP_DIR"
             echo "Using git branch: $GIT_BRANCH"
+            
+            # --- START: GIT AND OWNERSHIP MANAGEMENT FIXES ---
+            
+            # 1. Set full ownership of the directory to the SSH user (ubuntu)
+            # This allows subsequent 'git' commands to run without 'sudo'
+            echo "Setting directory ownership to SSH user (ubuntu)..."
+            sudo chown -R ubuntu:ubuntu "$APP_DIR"
+            
+            # 2. Navigate to the directory
+            cd "$APP_DIR" || { echo "Failed to navigate to project directory $APP_DIR"; exit 1; }
 
+            # 3. Mark the directory as safe for Git (run as the 'ubuntu' user)
             echo "Marking the directory as safe for Git..."
-            sudo git config --global --add safe.directory "$APP_DIR"
-
-            echo "Starting deployment..."
-            cd "$APP_DIR" || { echo "Failed to navigate to project directory"; exit 1; }
+            git config --global --add safe.directory "$APP_DIR" || true
 
             echo "Pulling latest code..."
-            sudo git fetch origin
-            sudo git checkout "$GIT_BRANCH"
-            sudo git reset --hard "origin/$GIT_BRANCH"
-            sudo git pull origin "$GIT_BRANCH"
+            # NO 'sudo' for these commands, as ownership is fixed
+            git fetch origin
+            git checkout "$GIT_BRANCH"
+            # Forcefully sync the local branch to the remote state
+            git reset --hard "origin/$GIT_BRANCH" 
+
+            # --- END: GIT AND OWNERSHIP MANAGEMENT FIXES ---
 
             echo "Installing composer dependencies..."
+            # composer install remains 'sudo' because it often needs root permission
             sudo composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
             echo "Migrating database..."
+            # Remember to check the .env file for correct DB_PASSWORD!
             sudo php artisan migrate --force
 
             echo "Database Seeding..."
@@ -58,10 +73,6 @@ jobs:
 
             echo "Linking storage..."
             sudo php artisan storage:link || true
-
-            echo "Fixing file ownership and permissions..."
-            sudo chown -R ubuntu:www-data storage bootstrap/cache
-            sudo chmod -R ug+rwx storage bootstrap/cache storage/logs
 
             echo "Clearing caches..."
             sudo php artisan route:clear
@@ -74,6 +85,15 @@ jobs:
             echo "Dumping autoload..."
             sudo composer dump-autoload
 
+            # --- START: FINAL OWNERSHIP AND PERMISSIONS ---
+
+            echo "Fixing file ownership and permissions for web server..."
+            # Ensure the web server user (www-data) can read/write to necessary directories
+            sudo chown -R ubuntu:www-data storage bootstrap/cache
+            sudo chmod -R ug+rwx storage bootstrap/cache storage/logs
+
+            # --- END: FINAL OWNERSHIP AND PERMISSIONS ---
+
             echo "Restarting Laravel queues..."
             sudo php artisan queue:restart
 
@@ -83,6 +103,7 @@ jobs:
             sudo supervisorctl restart all
 
             echo "Final config clear..."
+            # Redundant but harmless, ensuring no old cache remains
             sudo php artisan config:clear
 
             echo "Deployment completed successfully!"
