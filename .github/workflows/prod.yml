@@ -1,9 +1,9 @@
-name: Deploy Zinnvy APIs to Test Environment
+name: Deploy Zinnvy APIs to Production Environment
 
 on:
   push:
     branches:
-      - develop
+      - master
 
 jobs:
   deploy:
@@ -23,16 +23,16 @@ jobs:
             set -e
 
             echo "Marking the directory as safe for Git..."
-            sudo git config --global --add safe.directory /var/www/zinnvy-api-test
+            sudo git config --global --add safe.directory /var/www/zinnvy-api
 
 
             echo "Starting deployment..."
-            cd /var/www/zinnvy-api-test || { echo "Failed to navigate to project directory"; exit 1; }
+            cd /var/www/zinnvy-api || { echo "Failed to navigate to project directory"; exit 1; }
 
             echo "Pulling latest code..."
-            sudo git checkout develop
+            sudo git checkout master
             sudo git reset --hard
-            sudo -E env "GIT_SSH_COMMAND=ssh -i ${{ secrets.SSH_PRIVATE_KEY }}" git pull origin develop
+            sudo -E env "GIT_SSH_COMMAND=ssh -i ${{ secrets.SSH_PRIVATE_KEY }}" git pull origin master
 
             echo "Installing composer dependencies..."
             sudo composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
