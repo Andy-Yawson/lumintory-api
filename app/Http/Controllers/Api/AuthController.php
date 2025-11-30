@@ -109,7 +109,7 @@ class AuthController extends Controller
 
         SubscriptionHistory::create([
             'tenant_id' => $tenant->id,
-            'from_plan' => null,
+            'from_plan' => 'basic',
             'to_plan' => $tenant->plan,
             'event_type' => 'signup',
             'amount' => null,
