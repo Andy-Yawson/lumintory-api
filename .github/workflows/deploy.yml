@@ -1,9 +1,10 @@
-name: Deploy Zinnvy APIs to Test Environment
+name: Deploy Zinnvy APIs
 
 on:
   push:
     branches:
       - develop
+      - master
 
 jobs:
   deploy:
@@ -22,17 +23,29 @@ jobs:
           script: |
             set -e
 
-            echo "Marking the directory as safe for Git..."
-            sudo git config --global --add safe.directory /var/www/zinnvy-api-test
+            echo "Determining target directory and branch..."
+            if [ "${GITHUB_REF##*/}" = "master" ]; then
+              APP_DIR="/var/www/zinnvy-api"
+              GIT_BRANCH="master"
+            else
+              APP_DIR="/var/www/zinnvy-api-test"
+              GIT_BRANCH="develop"
+            fi
 
+            echo "Using app directory: $APP_DIR"
+            echo "Using git branch: $GIT_BRANCH"
+
+            echo "Marking the directory as safe for Git..."
+            sudo git config --global --add safe.directory "$APP_DIR"
 
             echo "Starting deployment..."
-            cd /var/www/zinnvy-api-test || { echo "Failed to navigate to project directory"; exit 1; }
+            cd "$APP_DIR" || { echo "Failed to navigate to project directory"; exit 1; }
 
             echo "Pulling latest code..."
-            sudo git checkout develop
-            sudo git reset --hard
-            sudo -E env "GIT_SSH_COMMAND=ssh -i ${{ secrets.SSH_PRIVATE_KEY }}" git pull origin develop
+            sudo git fetch origin
+            sudo git checkout "$GIT_BRANCH"
+            sudo git reset --hard "origin/$GIT_BRANCH"
+            sudo git pull origin "$GIT_BRANCH"
 
             echo "Installing composer dependencies..."
             sudo composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
@@ -58,6 +71,7 @@ jobs:
             echo "Optimizing application..."
             sudo php artisan optimize || true
 
+            echo "Dumping autoload..."
             sudo composer dump-autoload
 
             echo "Restarting Laravel queues..."
@@ -68,7 +82,7 @@ jobs:
             sudo supervisorctl update
             sudo supervisorctl restart all
 
+            echo "Final config clear..."
             sudo php artisan config:clear
-
 
             echo "Deployment completed successfully!"
