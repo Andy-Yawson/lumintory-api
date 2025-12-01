@@ -28,17 +28,23 @@ class LowStockForecastNotification extends Notification implements ShouldQueue
         $days = $this->forecast->predicted_days_to_stockout;
         $risk = strtoupper($this->forecast->stock_risk_level);
 
-        return (new MailMessage)
+        $mail = (new MailMessage)
             ->subject("[$risk] Low Stock Forecast – {$product->name}")
             ->greeting("Hi {$notifiable->name},")
-            ->line("Our inventory forecast shows **{$product->name}** may run out soon.")
+            ->line("Our inventory forecast shows {$product->name} may run out soon.")
             ->line("• Current stock: {$this->forecast->current_quantity}")
             ->line("• Avg daily sales: " . number_format($this->forecast->avg_daily_sales ?? 0, 2))
             ->line("• Predicted days to stockout: " . ($days !== null ? round($days, 1) : 'N/A'))
-            ->lineIf($this->forecast->stock_risk_level === 'critical', '⚠️ This is a CRITICAL risk item. Please restock as soon as possible.')
             ->action('View in Dashboard', url('/dashboard/products'))
             ->line('You received this because stock forecasting is enabled for your tenant.');
+
+        if ($this->forecast->stock_risk_level === 'critical') {
+            $mail->line('⚠️ This is a CRITICAL risk item. Please restock as soon as possible.');
+        }
+
+        return $mail;
     }
+
 
     public function toArray(object $notifiable): array
     {
