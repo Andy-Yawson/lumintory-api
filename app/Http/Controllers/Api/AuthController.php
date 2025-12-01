@@ -72,6 +72,8 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
             'ref' => 'nullable|string',
             'website' => 'nullable|string|max:255',
+            'currency' => 'nullable|string|max:10',
+            'currency_symbol' => 'nullable|string|max:10',
         ]);
 
         // If honeypot field is filled, silently reject
@@ -82,13 +84,21 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $currency = $validated['currency'] ?? 'GHS';
+        $currencySymbol = $validated['currency_symbol'] ?? 'GHS';
+
+
         // Create tenant
         $tenant = Tenant::create([
             'name' => $validated['tenant_name'],
             'domain' => null,
             'plan' => 'basic',
             'is_active' => true,
-            'subscription_ends_at' => Carbon::now()->addYear()
+            'subscription_ends_at' => Carbon::now()->addYear(),
+            'settings' => [
+                'currency' => $currency,
+                'currency_symbol' => $currencySymbol,
+            ],
         ]);
 
         $initialSms = PlanLimit::getLimit($tenant, 'sms');
@@ -113,7 +123,7 @@ class AuthController extends Controller
             'to_plan' => $tenant->plan,
             'event_type' => 'signup',
             'amount' => null,
-            'currency' => 'GHS',
+            'currency' => $currency,
             'effective_at' => now(),
             'meta' => [
                 'source' => 'self_signup',
@@ -164,7 +174,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Tenant registered successfully. Please activate subscription.',
-            'tenant' => $tenant,
+            'tenant' => $tenant->fresh(),
             'user' => $user,
             'token' => $token,
         ], 201);
