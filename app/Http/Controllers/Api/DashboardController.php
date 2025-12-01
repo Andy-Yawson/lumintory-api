@@ -93,6 +93,7 @@ class DashboardController extends Controller
                 'top_product' => $topProduct?->product->name ?? 'N/A',
                 'top_product_sold' => $topProduct?->total_sold ?? 0,
                 'currency' => Auth::user()->tenant->settings['currency'] ?? 'GHS',
+                'currency_symbol' => Auth::user()->tenant->settings['currency_symbol'] ?? '₵',
                 'generated_at' => now()->format('Y-m-d H:i'),
                 'graph' => $dates,
             ]);
