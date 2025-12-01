@@ -62,7 +62,7 @@ class InventoryForecastService
             ]);
 
             // Notify tenant admins only when at risk
-            if (in_array($risk, ['warning', 'critical']) && $daysToStockOut !== null) {
+            if (in_array($risk, ['warning', 'critical', 'ok']) && $daysToStockOut !== null) {
                 $admins = User::where('tenant_id', $tenantId)
                     ->where('role', 'Administrator')
                     ->get();
