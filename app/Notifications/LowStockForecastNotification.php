@@ -14,7 +14,8 @@ class LowStockForecastNotification extends Notification implements ShouldQueue
 
     public function __construct(
         public ProductForecast $forecast
-    ) {}
+    ) {
+    }
 
     public function via(object $notifiable): array
     {
