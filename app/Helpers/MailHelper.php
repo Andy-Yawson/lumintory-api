@@ -72,7 +72,7 @@ class MailHelper
     private static function queueEmail($email, $subject, $body)
     {
         try {
-            dispatch(new SendQueuedMail($email, $subject, $body));
+            dispatch(new SendQueuedMail($email, $subject, $body))->delay(now()->addSeconds(30));
         } catch (\Exception $e) {
             Log::error("Email queue failed to dispatch for $email: " . $e->getMessage());
         }
