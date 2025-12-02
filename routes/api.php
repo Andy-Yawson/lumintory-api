@@ -31,6 +31,7 @@ Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->m
 
 Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestReset']);
 Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
+Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('sms.callback');
 
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
