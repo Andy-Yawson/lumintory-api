@@ -16,7 +16,7 @@ class SMSCreditRemainder extends Command
         $service = app(SmsService::class);
         $balance = $service->getProviderBalance();
 
-        if ($balance['data']['balance'] < 100) {
+        if ($balance['data']['balance'] < 15) {
             MailHelper::sendEmailNotification(
                 "yawsonandrews@gmail.com",
                 "SMS BALANCE LOW",
