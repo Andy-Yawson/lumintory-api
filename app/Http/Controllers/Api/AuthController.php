@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\MailHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Referral;
 use App\Models\SmsCredit;
@@ -72,6 +73,8 @@ class AuthController extends Controller
             'password' => 'required|string|min:6',
             'ref' => 'nullable|string',
             'website' => 'nullable|string|max:255',
+            'currency' => 'nullable|string|max:10',
+            'currency_symbol' => 'nullable|string|max:10',
         ]);
 
         // If honeypot field is filled, silently reject
@@ -82,13 +85,21 @@ class AuthController extends Controller
             ], 422);
         }
 
+        $currency = $validated['currency'] ?? 'GHS';
+        $currencySymbol = $validated['currency_symbol'] ?? 'GHS';
+
+
         // Create tenant
         $tenant = Tenant::create([
             'name' => $validated['tenant_name'],
             'domain' => null,
             'plan' => 'basic',
             'is_active' => true,
-            'subscription_ends_at' => Carbon::now()->addYear()
+            'subscription_ends_at' => Carbon::now()->addYear(),
+            'settings' => [
+                'currency' => $currency,
+                'currency_symbol' => $currencySymbol,
+            ],
         ]);
 
         $initialSms = PlanLimit::getLimit($tenant, 'sms');
@@ -109,11 +120,11 @@ class AuthController extends Controller
 
         SubscriptionHistory::create([
             'tenant_id' => $tenant->id,
-            'from_plan' => null,
+            'from_plan' => 'basic',
             'to_plan' => $tenant->plan,
             'event_type' => 'signup',
             'amount' => null,
-            'currency' => 'GHS',
+            'currency' => $currency,
             'effective_at' => now(),
             'meta' => [
                 'source' => 'self_signup',
@@ -164,7 +175,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Tenant registered successfully. Please activate subscription.',
-            'tenant' => $tenant,
+            'tenant' => $tenant->fresh(),
             'user' => $user,
             'token' => $token,
         ], 201);
@@ -275,5 +286,24 @@ class AuthController extends Controller
             'message' => 'User added successfully.',
             'user' => $user,
         ], 201);
+    }
+
+    public function contactUs(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'message' => 'required|string',
+        ]);
+
+        $subject = 'Zinnvy Contact Us: ' . $validated['name'] . ' (' . $validated['email'] . ')';
+        foreach (['yawsonandrews@gmail.com', 'ugin.dev@gmail.com'] as $email) {
+            MailHelper::sendEmailNotification($email, $subject, $validated['message']);
+        }
+
+        return response()->json([
+            'message' => 'Message sent successfully.',
+            'success' => true,
+        ]);
     }
 }

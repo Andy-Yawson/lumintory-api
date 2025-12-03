@@ -21,15 +21,19 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\TokenController;
 use Illuminate\Support\Facades\Route;
 
 
-Route::post('/v1/login', [AuthController::class, 'login']);
+Route::post('/v1/login', [AuthController::class, 'login'])->middleware('throttle:3,1');
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
 
 Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestReset']);
 Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
+Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('sms.callback');
+
+Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
 
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
@@ -39,6 +43,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/users', [AuthController::class, 'listUsers']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
     Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
+    Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
+    Route::post('/tenant/settings', [TenantSettingsController::class, 'update']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 

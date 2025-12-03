@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\MailHelper;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\ProductForecast;
@@ -68,9 +69,10 @@ class InventoryForecastService
                     ->get();
 
                 foreach ($admins as $admin) {
-                    $admin->notify(new LowStockForecastNotification($forecast));
+                    MailHelper::sendLowStockForecastEmail($admin, $forecast);
                 }
             }
         }
     }
+
 }

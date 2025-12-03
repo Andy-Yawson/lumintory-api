@@ -12,6 +12,7 @@ class Tenant extends Model
     protected $fillable = [
         'name',
         'domain',
+        'plan',
         'settings',
         'subscription_ends_at',
         'referral_code',
