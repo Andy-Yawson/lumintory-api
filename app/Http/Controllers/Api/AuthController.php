@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\MailHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Referral;
 use App\Models\SmsCredit;
@@ -285,5 +286,24 @@ class AuthController extends Controller
             'message' => 'User added successfully.',
             'user' => $user,
         ], 201);
+    }
+
+    public function contactUs(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'message' => 'required|string',
+        ]);
+
+        $subject = 'Zinnvy Contact Us: ' . $validated['name'] . ' (' . $validated['email'] . ')';
+        foreach (['yawsonandrews@gmail.com', 'ugin.dev@gmail.com'] as $email) {
+            MailHelper::sendEmailNotification($email, $subject, $validated['message']);
+        }
+
+        return response()->json([
+            'message' => 'Message sent successfully.',
+            'success' => true,
+        ]);
     }
 }
