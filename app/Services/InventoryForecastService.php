@@ -132,19 +132,21 @@ class InventoryForecastService
             }
 
             // --- PERSIST FORECAST ---
+            if (in_array($risk, ['warning', 'critical'])) {
+                $forecast = ProductForecast::create([
+                    'tenant_id' => $tenantId,
+                    'product_id' => $productId,
+                    'window_days' => $windowDays,
+                    'avg_daily_sales' => $avgDailySales ?: null,
+                    'predicted_days_to_stockout' => $daysToStockOut,
+                    'current_quantity' => (int) $currentQty,
+                    'stock_risk_level' => $risk,
+                    'reorder_point' => (int) $reorderPoint,
+                    'safety_stock' => (int) $safetyStock,
+                    'forecasted_at' => now(),
+                ]);
+            }
 
-            $forecast = ProductForecast::create([
-                'tenant_id' => $tenantId,
-                'product_id' => $productId,
-                'window_days' => $windowDays,
-                'avg_daily_sales' => $avgDailySales ?: null,
-                'predicted_days_to_stockout' => $daysToStockOut,
-                'current_quantity' => (int) $currentQty,
-                'stock_risk_level' => $risk,
-                'reorder_point' => (int) $reorderPoint,
-                'safety_stock' => (int) $safetyStock,
-                'forecasted_at' => now(),
-            ]);
 
             // Notify tenant admins only when at risk
             if (in_array($risk, ['warning', 'critical']) && $daysToStockOut !== null) {
