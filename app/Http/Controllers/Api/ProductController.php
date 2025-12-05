@@ -48,6 +48,8 @@ class ProductController extends Controller
             'unit_price' => 'required|numeric',
             'variations' => 'nullable|array',
             'description' => 'nullable|string',
+            'lead_time_days' => 'nullable|integer',
+            'min_stock_threshold' => 'nullable|integer',
         ]);
 
         $data['tenant_id'] = Auth::user()->tenant_id;
@@ -78,6 +80,9 @@ class ProductController extends Controller
             'quantity' => 'integer',
             'unit_price' => 'numeric',
             'variations' => 'nullable|array',
+            'description' => 'nullable|string',
+            'lead_time_days' => 'nullable|integer',
+            'min_stock_threshold' => 'nullable|integer',
         ]));
 
         return $product;
