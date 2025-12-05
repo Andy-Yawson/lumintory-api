@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('inventory:forecast --window=30')->twiceDaily();
+        $schedule->command('inventory:forecast --window=30')->everyThreeHours();
         $schedule->command('app:credit-remainder')->everyFifteenMinutes();
     }
 
