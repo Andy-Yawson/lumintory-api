@@ -16,9 +16,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('app:credit-remainder')->everyFifteenMinutes();
     }
 
-    /**
-     * Register the commands for the application.
-     */
+
     protected function commands(): void
     {
         $this->load(__DIR__ . '/Commands');
