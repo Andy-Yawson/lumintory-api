@@ -21,6 +21,8 @@ class Product extends Model
         'description',
         'external_id',
         'sku',
+        'lead_time_days',
+        'min_stock_threshold',
     ];
 
     protected $casts = [
