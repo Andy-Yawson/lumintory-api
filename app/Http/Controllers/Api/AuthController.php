@@ -93,7 +93,7 @@ class AuthController extends Controller
         $tenant = Tenant::create([
             'name' => $validated['tenant_name'],
             'domain' => null,
-            'plan' => 'pro',
+            'plan' => 'basic',
             'is_active' => true,
             'subscription_ends_at' => Carbon::now()->addYear(),
             'settings' => [
