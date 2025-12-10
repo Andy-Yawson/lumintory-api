@@ -12,8 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('inventory:forecast --window=30')->everyThreeHours();
-        $schedule->command('app:credit-remainder')->everyFifteenMinutes();
+        $schedule->command('inventory:forecast --window=30')->dailyAt('01:00');
+        $schedule->command('app:credit-remainder')->hourly();
     }
 
 
