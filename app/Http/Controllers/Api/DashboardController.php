@@ -19,7 +19,7 @@ class DashboardController extends Controller
         $cacheKey = "dashboard_stats_tenant_{$tenantId}";
 
 
-        return Cache::remember($cacheKey, now()->addMinutes(2), function () use ($tenantId) {
+        return Cache::remember($cacheKey, now()->addMinutes(1), function () use ($tenantId) {
 
             $today = Carbon::today();
             $totalProducts = Product::where('tenant_id', $tenantId)->count();

@@ -19,20 +19,30 @@ class SaleController extends Controller
     {
         $perPage = $request->get('per_page', 20);
         $search = $request->get('search');
+        $date = $request->get('date');
 
         $query = Sale::with(['product', 'customer'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->orderByDesc('sale_date');
 
+        if ($date) {
+            $query->whereDate('sale_date', Carbon::parse($date));
+        }
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('notes', 'like', "%{$search}%")
-                    ->orWhereHas('product', function ($q2) use ($search) {
-                        $q2->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('customer', function ($q3) use ($search) {
-                        $q3->where('name', 'like', "%{$search}%");
-                    });
+                    ->orWhereHas(
+                        'product',
+                        fn($q2) =>
+                        $q2->where('name', 'like', "%{$search}%")
+                    )
+                    ->orWhereHas(
+                        'customer',
+                        fn($q3) =>
+                        $q3->where('name', 'like', "%{$search}%")
+                    )
+                    ->orWhere('total_amount', 'like', "%{$search}%");
             });
         }
 
