@@ -139,7 +139,7 @@ class InventoryForecastService
             ->exists();
 
         if (!$alreadyNotified) {
-            // Create Record and Send Mail here...
+            // Create Record and Send Mail
             $forecast = ProductForecast::create([
                 'tenant_id' => $product->tenant_id,
                 'product_id' => $product->id,
