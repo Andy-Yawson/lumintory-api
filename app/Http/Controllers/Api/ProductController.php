@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\ProductsImport;
 use App\Models\Product;
 use App\Services\PlanLimit;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -148,6 +149,31 @@ class ProductController extends Controller
         ]);
     }
 
+    public function addStock(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $id) {
+                // Find product (Global Scope handles tenant_id check)
+                $product = Product::findOrFail($id);
+
+                $oldQuantity = $product->quantity;
+                $product->increment('quantity', $request->quantity);
+
+                return response()->json([
+                    'message' => 'Stock updated successfully',
+                    'product_id' => $product->id,
+                    'new_quantity' => $product->quantity,
+                    'added' => $request->quantity
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to update stock'], 500);
+        }
+    }
 
     protected function authorizeProduct(Product $product)
     {

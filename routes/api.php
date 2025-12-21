@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('/products/import', [ProductController::class, 'import']);
+    Route::post('/products/{id}/add-stock', [ProductController::class, 'addStock']);
 
     Route::post('sales', [SaleController::class, 'store'])->middleware('limit.sales');
     Route::apiResource('sales', SaleController::class);
