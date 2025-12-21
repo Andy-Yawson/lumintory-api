@@ -5,17 +5,53 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ReturnItem;
 use App\Models\Sale;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReturnItemController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return ReturnItem::with(['sale.product', 'sale.customer'])
+        $perPage = $request->get('per_page', 10);
+        $search = $request->get('search');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        $query = ReturnItem::with(['sale.product', 'sale.customer'])
             ->where('tenant_id', Auth::user()->tenant_id)
-            ->orderByDesc('return_date')
-            ->paginate(20);
+            ->orderByDesc('return_date');
+
+        // Date Range Filtering
+        if ($startDate && $endDate) {
+            $query->whereBetween('return_date', [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay()
+            ]);
+        } elseif ($startDate) {
+            $query->whereDate('return_date', '>=', Carbon::parse($startDate));
+        } elseif ($endDate) {
+            $query->whereDate('return_date', '<=', Carbon::parse($endDate));
+        }
+
+        // Search Logic
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reason', 'like', "%{$search}%")
+                    ->orWhereHas('sale.product', fn($q2) => $q2->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('sale.customer', fn($q3) => $q3->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        $returns = $query->paginate($perPage);
+
+        return response()->json([
+            'data' => $returns->items(),
+            'current_page' => $returns->currentPage(),
+            'last_page' => $returns->lastPage(),
+            'total' => $returns->total(),
+            'per_page' => $returns->perPage(),
+        ]);
     }
 
     public function store(Request $request)
