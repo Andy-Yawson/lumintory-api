@@ -64,93 +64,98 @@ class InventoryForecastService
 
     public function forecastForTenant(int $tenantId, int $windowDays = 30): void
     {
-        $endDate = Carbon::today();
-        $startDate = $endDate->copy()->subDays($windowDays - 1);
-
-        // Aggregate total sales for all products to calculate AVG Daily Sales efficiently
-        $salesAgg = Sale::select('product_id', DB::raw('SUM(quantity) as total_sold'))
-            ->where('tenant_id', $tenantId)
-            ->whereBetween('sale_date', [$startDate->startOfDay(), $endDate->endOfDay()])
-            ->groupBy('product_id')
-            ->pluck('total_sold', 'product_id');
-
         $products = Product::where('tenant_id', $tenantId)->get();
 
         foreach ($products as $product) {
-            $productId = $product->id;
-            $totalSold = (float) ($salesAgg[$productId] ?? 0);
-            $days = max($windowDays, 1);
+            $dailySales = $this->getDailySalesArray($tenantId, $product->id, $windowDays);
 
-            $avgDailySales = $totalSold > 0 ? $totalSold / $days : 0.0;
+            // 1. Calculate Weighted Average (Recent 7 days count double)
+            $totalDays = count($dailySales);
+            $recentDays = array_slice($dailySales, -7);
+            $avgDailySales = array_sum($dailySales) / $totalDays;
+            $recentAvg = array_sum($recentDays) / 7;
+
+            // Blend the two: 70% overall trend, 30% recent activity
+            $adjustedDemand = ($avgDailySales * 0.7) + ($recentAvg * 0.3);
+
+            // 2. Standard Deviation (using the zero-filled array)
+            $mean = array_sum($dailySales) / $totalDays;
+            $variance = array_reduce($dailySales, fn($carry, $item) => $carry + pow($item - $mean, 2), 0.0) / $totalDays;
+            $demandStdDev = sqrt($variance);
+
+            // 3. Safety Stock & ROP
+            $leadTime = (int) ($product->lead_time_days ?? 7);
+            $safetyStock = ceil(self::SERVICE_LEVEL_Z_SCORE * $demandStdDev * sqrt($leadTime));
+            $safetyStock = max($safetyStock, (int) $product->min_stock_threshold);
+
+            $reorderPoint = ceil(($adjustedDemand * $leadTime) + $safetyStock);
+
+            // 4. Determine Risk
             $currentQty = (float) $product->quantity;
-
-            // --- PRODUCT SETTINGS (from the new migration) ---
-            $leadTimeDays = (int) ($product->lead_time_days ?? 7); // Default 7 days
-            $minStockThreshold = (int) ($product->min_stock_threshold ?? 10); // Default 10 units
-
-            // --- ADVANCED SAFETY STOCK CALCULATION ---
-
-            // 1. Calculate Standard Deviation of Daily Demand (sigma_L)
-            $demandStdDev = $this->calculateDemandStandardDeviation($tenantId, $productId, $windowDays);
-
-            // 2. Calculate Safety Stock (SS)
-            // SS = Z * sigma_L * sqrt(Lead Time)
-            $safetyStockFromDemand = 0;
-            if ($demandStdDev > 0) {
-                $safetyStockFromDemand = self::SERVICE_LEVEL_Z_SCORE
-                    * $demandStdDev
-                    * sqrt($leadTimeDays);
-            }
-
-            // The effective Safety Stock is the greater of the Min Stock Threshold OR the calculated value.
-            // This ensures products with very low demand still meet the manager's minimum (e.g., 10 units).
-            $safetyStock = max($minStockThreshold, ceil($safetyStockFromDemand));
-
-            // --- REORDER POINT (ROP) CALCULATION ---
-            // ROP = (AVG Daily Sales * Lead Time) + Safety Stock
-            $leadTimeDemand = $avgDailySales * $leadTimeDays;
-            $reorderPoint = ceil($leadTimeDemand + $safetyStock);
-
-
-            // --- DAYS TO STOCKOUT & RISK ASSESSMENT ---
-
-            $daysToStockOut = null;
-            if ($avgDailySales > 0) {
-                $daysToStockOut = $currentQty / $avgDailySales;
-            }
-
             $risk = 'ok';
-
-            if ($currentQty <= 0) {
+            if ($currentQty <= $safetyStock)
                 $risk = 'critical';
-            } elseif ($currentQty < $safetyStock) {
-                // Critical if current stock is below the minimum buffer.
-                $risk = 'critical';
-            } elseif ($currentQty <= $reorderPoint) {
-                // Warning if current stock hits or crosses the ROP trigger.
+            elseif ($currentQty <= $reorderPoint)
                 $risk = 'warning';
-            }
 
-            // --- PERSIST FORECAST ---
+            // 5. Smart Notification (Prevention of Spam)
             if (in_array($risk, ['warning', 'critical'])) {
-                $forecast = ProductForecast::create([
-                    'tenant_id' => $tenantId,
-                    'product_id' => $productId,
-                    'window_days' => $windowDays,
-                    'avg_daily_sales' => $avgDailySales ?: null,
-                    'predicted_days_to_stockout' => $daysToStockOut,
-                    'current_quantity' => (int) $currentQty,
-                    'stock_risk_level' => $risk,
-                    'reorder_point' => (int) $reorderPoint,
-                    'safety_stock' => (int) $safetyStock,
-                    'forecasted_at' => now(),
-                ]);
+                $this->persistAndNotify($product, $risk, $reorderPoint, $safetyStock, $adjustedDemand);
             }
+        }
+    }
 
+    private function getDailySalesArray(int $tenantId, int $productId, int $windowDays): array
+    {
+        $endDate = Carbon::today();
+        $startDate = $endDate->copy()->subDays($windowDays - 1);
+
+        $sales = Sale::select(
+            DB::raw('DATE(sale_date) as day'),
+            DB::raw('SUM(quantity) as total_sold')
+        )
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->whereBetween('sale_date', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->groupBy('day')
+            ->pluck('total_sold', 'day')
+            ->toArray();
+
+        // Zero-fill missing days to ensure the Standard Deviation is accurate
+        $filledSales = [];
+        for ($i = 0; $i < $windowDays; $i++) {
+            $date = $startDate->copy()->addDays($i)->format('Y-m-d');
+            $filledSales[] = (float) ($sales[$date] ?? 0.0);
+        }
+
+        return $filledSales;
+    }
+
+    private function persistAndNotify($product, $risk, $rop, $ss, $avgDemand)
+    {
+        // Check if we already notified about this product in the last 24 hours
+        $alreadyNotified = ProductForecast::where('product_id', $product->id)
+            ->where('created_at', '>', now()->subHours(24))
+            ->exists();
+
+        if (!$alreadyNotified) {
+            // Create Record and Send Mail here...
+            $forecast = ProductForecast::create([
+                'tenant_id' => $product->tenant_id,
+                'product_id' => $product->id,
+                'window_days' => 30,
+                'avg_daily_sales' => $avgDemand,
+                'predicted_days_to_stockout' => null,
+                'current_quantity' => $product->quantity,
+                'stock_risk_level' => $risk,
+                'reorder_point' => $rop,
+                'safety_stock' => $ss,
+                'forecasted_at' => now(),
+            ]);
 
             // Notify tenant admins only when at risk
-            if (in_array($risk, ['warning', 'critical']) && $daysToStockOut !== null) {
-                $admins = User::where('tenant_id', $tenantId)
+            if (in_array($risk, ['warning', 'critical'])) {
+                $admins = User::where('tenant_id', $product->tenant_id)
                     ->where('role', 'Administrator')
                     ->get();
 
