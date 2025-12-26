@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Api\Admin\AdminTenantController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
 use App\Http\Controllers\Api\IntegrationProductController;
@@ -53,6 +54,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('/products/import', [ProductController::class, 'import']);
     Route::post('/products/{id}/add-stock', [ProductController::class, 'addStock']);
+
+    Route::apiResource('categories', CategoryController::class);
 
     Route::post('sales', [SaleController::class, 'store'])->middleware('limit.sales');
     Route::apiResource('sales', SaleController::class);
