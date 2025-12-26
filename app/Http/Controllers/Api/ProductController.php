@@ -51,6 +51,7 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'lead_time_days' => 'nullable|integer',
             'min_stock_threshold' => 'nullable|integer',
+            'category_id' => 'nullable|exists:categories,id',
         ]);
 
         $data['tenant_id'] = Auth::user()->tenant_id;
@@ -84,6 +85,7 @@ class ProductController extends Controller
             'description' => 'nullable|string',
             'lead_time_days' => 'nullable|integer',
             'min_stock_threshold' => 'nullable|integer',
+            'category_id' => 'nullable|exists:categories,id',
         ]));
 
         return $product;
