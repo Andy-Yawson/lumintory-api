@@ -23,6 +23,7 @@ class Product extends Model
         'sku',
         'lead_time_days',
         'min_stock_threshold',
+        'category_id'
     ];
 
     protected $casts = [
@@ -85,5 +86,10 @@ class Product extends Model
     public function getFormattedPriceAttribute(): string
     {
         return number_format($this->unit_price, 2);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
     }
 }
