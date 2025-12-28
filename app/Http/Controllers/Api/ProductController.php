@@ -19,11 +19,14 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
 
-        $query = Product::where('tenant_id', Auth::user()->tenant_id);
+        $query = Product::with('category')->where('tenant_id', Auth::user()->tenant_id);
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
-                ->orWhere('size', 'like', "%{$search}%");
+                ->orWhere('size', 'like', "%{$search}%")
+                ->orWhereHas('category', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                });
         }
 
         $products = $query->paginate($perPage);
