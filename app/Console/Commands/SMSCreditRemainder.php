@@ -17,11 +17,13 @@ class SMSCreditRemainder extends Command
         $balance = $service->getProviderBalance();
 
         if ($balance['data']['balance'] < 15) {
-            MailHelper::sendEmailNotification(
-                "yawsonandrews@gmail.com",
-                "SMS BALANCE LOW",
-                "Provider balance is now: " . $balance['data']['balance']
-            );
+            foreach (["yawsonandrews@gmail.com", "ugin.dev@gmail.com"] as $email) {
+                MailHelper::sendEmailNotification(
+                    $email,
+                    "SMS BALANCE LOW",
+                    "Provider balance is now: " . $balance['data']['balance']
+                );
+            }
         }
     }
 }

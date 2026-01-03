@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Api\Admin\AdminTenantController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
 use App\Http\Controllers\Api\IntegrationProductController;
@@ -42,16 +43,20 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/add-user', [AuthController::class, 'addUser'])->middleware('limit.users');
     Route::get('/users', [AuthController::class, 'listUsers']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
-    Route::post('/v1/activate-subscription', [AuthController::class, 'activateSubscription']);
+    Route::post('activate-subscription', [AuthController::class, 'activateSubscription']);
     Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
     Route::post('/tenant/settings', [TenantSettingsController::class, 'update']);
 
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     Route::post('product', [ProductController::class, 'store'])->middleware('limit.products');
+    Route::get('products/low-stock', [ProductController::class, 'lowStock']);
     Route::apiResource('products', ProductController::class);
-    Route::get('/products/import/template', [ProductController::class, 'downloadTemplate']);
-    Route::post('/products/import', [ProductController::class, 'import']);
+    Route::get('products/import/template', [ProductController::class, 'downloadTemplate']);
+    Route::post('products/import', [ProductController::class, 'import']);
+    Route::post('products/{id}/add-stock', [ProductController::class, 'addStock']);
+
+    Route::apiResource('categories', CategoryController::class);
 
     Route::post('sales', [SaleController::class, 'store'])->middleware('limit.sales');
     Route::apiResource('sales', SaleController::class);

@@ -21,6 +21,9 @@ class Product extends Model
         'description',
         'external_id',
         'sku',
+        'lead_time_days',
+        'min_stock_threshold',
+        'category_id'
     ];
 
     protected $casts = [
@@ -55,15 +58,19 @@ class Product extends Model
 
     public function getVariationPrice($value)
     {
+        $basePrice = $this->unit_price;
+
         if (!$this->variations || !is_array($this->variations)) {
-            return $this->unit_price;
+            return number_format($basePrice, 2);
         }
 
         $variation = collect($this->variations)->first(function ($v) use ($value) {
             return strtolower($v['value'] ?? '') === strtolower($value);
         });
 
-        return $variation['price'] ?? $this->unit_price;
+        $price = $variation['price'] ?? $basePrice;
+
+        return number_format($price, 2);
     }
 
     public function forecasts()
@@ -74,5 +81,15 @@ class Product extends Model
     public function latestForecast()
     {
         return $this->hasOne(ProductForecast::class)->latestOfMany('forecasted_at');
+    }
+
+    public function getFormattedPriceAttribute(): string
+    {
+        return number_format($this->unit_price, 2);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
     }
 }

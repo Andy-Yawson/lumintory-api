@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,20 +20,31 @@ class SaleController extends Controller
     {
         $perPage = $request->get('per_page', 20);
         $search = $request->get('search');
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
 
         $query = Sale::with(['product', 'customer'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->orderByDesc('sale_date');
 
+        // Apply Date Range Filter
+        if ($startDate && $endDate) {
+            $query->whereBetween('sale_date', [
+                Carbon::parse($startDate)->startOfDay(),
+                Carbon::parse($endDate)->endOfDay()
+            ]);
+        } elseif ($startDate) {
+            $query->whereDate('sale_date', '>=', Carbon::parse($startDate));
+        } elseif ($endDate) {
+            $query->whereDate('sale_date', '<=', Carbon::parse($endDate));
+        }
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('notes', 'like', "%{$search}%")
-                    ->orWhereHas('product', function ($q2) use ($search) {
-                        $q2->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('customer', function ($q3) use ($search) {
-                        $q3->where('name', 'like', "%{$search}%");
-                    });
+                    ->orWhereHas('product', fn($q2) => $q2->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('customer', fn($q3) => $q3->where('name', 'like', "%{$search}%"))
+                    ->orWhere('total_amount', 'like', "%{$search}%");
             });
         }
 
@@ -50,31 +62,47 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'product_id' => 'required|exists:products,id',
+        // Validate the structure including the new 'items' array
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_price' => 'required|numeric',
+            'items.*.variation' => 'nullable',
             'customer_id' => 'nullable|exists:customers,id',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric',
             'notes' => 'nullable|string',
             'sale_date' => 'nullable|date',
-            'variation' => 'nullable|array'
         ]);
 
-        $product = Product::findOrFail($data['product_id']);
-        $this->authorizeTenant($product);
+        try {
+            return DB::transaction(function () use ($request) {
+                $sales = [];
+                $saleDate = $request->sale_date ? Carbon::parse($request->sale_date) : now();
+                $tenantId = Auth::user()->tenant_id;
 
-        // Override price from variation if provided
-        if (!empty($data['variation']['value'])) {
-            $data['unit_price'] = $product->getVariationPrice($data['variation']['value']);
+                foreach ($request->items as $item) {
+                    $sales[] = Sale::create([
+                        'tenant_id' => $tenantId,
+                        'product_id' => $item['product_id'],
+                        'customer_id' => $request->customer_id,
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'variation' => $item['variation'] ?? null,
+                        'total_amount' => $item['quantity'] * $item['unit_price'],
+                        'notes' => $request->notes,
+                        'sale_date' => $saleDate,
+                    ]);
+                }
+
+                return response()->json([
+                    'message' => 'Sales recorded successfully',
+                    'count' => count($sales),
+                    'sales' => $sales
+                ], 201);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to record sales: ' . $e->getMessage()], 500);
         }
-
-        $data['total_amount'] = $data['quantity'] * $data['unit_price'];
-        $data['tenant_id'] = Auth::user()->tenant_id;
-        $data['sale_date'] = is_null($data["sale_date"]) ? now() : Carbon::parse($data["sale_date"]);
-
-        $sale = Sale::create($data);
-
-        return response()->json($sale->load('product', 'customer'), 201);
     }
 
     /**

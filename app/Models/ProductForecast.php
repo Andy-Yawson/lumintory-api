@@ -18,6 +18,8 @@ class ProductForecast extends Model
         'current_quantity',
         'stock_risk_level',
         'forecasted_at',
+        'reorder_point',
+        'safety_stock',
     ];
 
     protected $casts = [
@@ -25,6 +27,8 @@ class ProductForecast extends Model
         'predicted_days_to_stockout' => 'float',
         'current_quantity' => 'integer',
         'forecasted_at' => 'datetime',
+        'reorder_point' => 'integer',
+        'safety_stock' => 'integer',
     ];
 
     public function product()

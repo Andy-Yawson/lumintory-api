@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\ProductsImport;
 use App\Models\Product;
 use App\Services\PlanLimit;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Maatwebsite\Excel\Facades\Excel;
@@ -18,11 +19,14 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
 
-        $query = Product::where('tenant_id', Auth::user()->tenant_id);
+        $query = Product::with('category')->where('tenant_id', Auth::user()->tenant_id);
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
-                ->orWhere('size', 'like', "%{$search}%");
+                ->orWhere('size', 'like', "%{$search}%")
+                ->orWhereHas('category', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                });
         }
 
         $products = $query->paginate($perPage);
@@ -48,6 +52,9 @@ class ProductController extends Controller
             'unit_price' => 'required|numeric',
             'variations' => 'nullable|array',
             'description' => 'nullable|string',
+            'lead_time_days' => 'nullable|integer',
+            'min_stock_threshold' => 'nullable|integer',
+            'category_id' => 'nullable|exists:categories,id',
         ]);
 
         $data['tenant_id'] = Auth::user()->tenant_id;
@@ -78,6 +85,10 @@ class ProductController extends Controller
             'quantity' => 'integer',
             'unit_price' => 'numeric',
             'variations' => 'nullable|array',
+            'description' => 'nullable|string',
+            'lead_time_days' => 'nullable|integer',
+            'min_stock_threshold' => 'nullable|integer',
+            'category_id' => 'nullable|exists:categories,id',
         ]));
 
         return $product;
@@ -143,6 +154,50 @@ class ProductController extends Controller
         ]);
     }
 
+    public function addStock(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $id) {
+                // Find product (Global Scope handles tenant_id check)
+                $product = Product::findOrFail($id);
+
+                $oldQuantity = $product->quantity;
+                $product->increment('quantity', $request->quantity);
+
+                return response()->json([
+                    'message' => 'Stock updated successfully',
+                    'product_id' => $product->id,
+                    'new_quantity' => $product->quantity,
+                    'added' => $request->quantity
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Failed to update stock'], 500);
+        }
+    }
+
+    public function lowStock()
+    {
+        $products = Product::where(function ($query) {
+            $query->whereRaw('quantity <= min_stock_threshold')
+                ->orWhere(function ($q) {
+                    $q->whereNull('min_stock_threshold')
+                        ->where('quantity', '<=', 10);
+                });
+        })
+            ->with('category')
+            ->orderBy('quantity', 'asc')
+            ->get();
+
+        return response()->json([
+            'data' => $products,
+            'count' => $products->count()
+        ]);
+    }
 
     protected function authorizeProduct(Product $product)
     {

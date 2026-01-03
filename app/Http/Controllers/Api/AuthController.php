@@ -173,6 +173,10 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        foreach (["yawsonandrews@gmail.com", "ugin.dev@gmail.com"] as $email) {
+            MailHelper::sendEmailNotification($email, "New tenant signed up: {$tenant->name}", "You have one new tenant registered.\n \n\nRegards,\nZinnvy.");
+        }
+
         return response()->json([
             'message' => 'Tenant registered successfully. Please activate subscription.',
             'tenant' => $tenant->fresh(),

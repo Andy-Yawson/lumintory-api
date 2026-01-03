@@ -58,7 +58,7 @@ class MailHelper
         }
 
         $lines[] = "";
-        $lines[] = "You can view more details in your dashboard: " . url('/dashboard/products');
+        $lines[] = "You can view more details in your dashboard: " . env('FRONTEND_URL') . '/dashboard/products';
         $lines[] = "";
         $lines[] = "You received this because stock forecasting is enabled for your tenant.";
         $lines[] = "";
