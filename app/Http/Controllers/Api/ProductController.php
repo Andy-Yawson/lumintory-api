@@ -180,6 +180,25 @@ class ProductController extends Controller
         }
     }
 
+    public function lowStock()
+    {
+        $products = Product::where(function ($query) {
+            $query->whereRaw('quantity <= min_stock_threshold')
+                ->orWhere(function ($q) {
+                    $q->whereNull('min_stock_threshold')
+                        ->where('quantity', '<=', 10);
+                });
+        })
+            ->with('category')
+            ->orderBy('quantity', 'asc')
+            ->get();
+
+        return response()->json([
+            'data' => $products,
+            'count' => $products->count()
+        ]);
+    }
+
     protected function authorizeProduct(Product $product)
     {
         if ($product->tenant_id !== Auth::user()->tenant_id) {
