@@ -48,7 +48,7 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => 'required|string',
             'size' => 'nullable|string',
-            'quantity' => 'required|integer',
+            'quantity' => 'required|numeric',
             'unit_price' => 'required|numeric',
             'variations' => 'nullable|array',
             'description' => 'nullable|string',
@@ -82,7 +82,7 @@ class ProductController extends Controller
         $product->update($request->validate([
             'name' => 'string',
             'size' => 'nullable|string',
-            'quantity' => 'integer',
+            'quantity' => 'numeric',
             'unit_price' => 'numeric',
             'variations' => 'nullable|array',
             'description' => 'nullable|string',

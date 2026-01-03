@@ -66,7 +66,7 @@ class SaleController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|numeric',
             'items.*.unit_price' => 'required|numeric',
             'items.*.variation' => 'nullable',
             'customer_id' => 'nullable|exists:customers,id',
@@ -125,7 +125,7 @@ class SaleController extends Controller
         $sale->product->increment('quantity', $sale->quantity);
 
         $data = $request->validate([
-            'quantity' => 'integer|min:1',
+            'quantity' => 'numeric',
             'unit_price' => 'numeric',
             'notes' => 'nullable|string',
             'sale_date' => 'date',
