@@ -58,7 +58,7 @@ class ReturnItemController extends Controller
     {
         $data = $request->validate([
             'sale_id' => 'required|exists:sales,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric',
             'refund_amount' => 'required|numeric',
             'reason' => 'required|string',
             'return_date' => 'required|date',
