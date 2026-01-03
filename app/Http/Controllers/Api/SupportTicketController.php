@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\MailHelper;
 use App\Http\Controllers\Controller;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
+use App\Models\User;
 use Carbon\Carbon;
 use DB;
 use Illuminate\Http\Request;
@@ -59,7 +61,11 @@ class SupportTicketController extends Controller
             'message' => $data['description'],
         ]);
 
-        // TODO: dispatch notification to internal support email/Slack
+        // dispatch notification to internal support email/Slack
+        $admins = User::where('role', 'SuperAdmin')->get();
+        foreach ($admins as $admin) {
+            MailHelper::sendEmailNotification($admin->email, 'New Support Ticket', 'A new support ticket has been created: ' . $ticket->subject);
+        }
 
         return response()->json(['success' => true, 'ticket' => $ticket], 201);
     }

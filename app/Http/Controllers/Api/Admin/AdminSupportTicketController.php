@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Helpers\MailHelper;
 use App\Http\Controllers\Controller;
 use App\Models\SupportTicket;
 use App\Models\SupportTicketMessage;
 use App\Models\Tenant;
+use App\Models\User;
 use Carbon\Carbon;
 use DB;
 use Illuminate\Http\Request;
@@ -70,7 +72,9 @@ class AdminSupportTicketController extends Controller
 
         $ticket->load('messages.user');
 
-        // TODO: notify ticket owner
+        // notify ticket owner
+        $tenantAdmin = User::where('tenant_id', $ticket->tenant_id)->where('role', 'Administrator')->first();
+        MailHelper::sendEmailNotification($tenantAdmin->email, 'Support Ticket Status Updated', 'You have received a new message on your support ticket: ' . $ticket->subject);
 
         return response()->json([
             'success' => true,
@@ -111,6 +115,9 @@ class AdminSupportTicketController extends Controller
         $ticket->update([
             'status' => $data['status'],
         ]);
+
+        $tenantAdmin = User::where('tenant_id', $ticket->tenant_id)->where('role', 'Administrator')->first();
+        MailHelper::sendEmailNotification($tenantAdmin->email, 'Support Ticket Status Updated', 'The status of your support ticket has been updated to ' . $data['status']);
 
         return response()->json([
             'success' => true,

@@ -74,7 +74,7 @@ class AdminTenantController extends Controller
             'subscription_ends_at' => 'sometimes|date',
         ]);
 
-        $tenantAdmin = User::where('tenant_id', $tenant->id)->where('role', 'admin')->first();
+        $tenantAdmin = User::where('tenant_id', $tenant->id)->where('role', 'Administrator')->first();
 
         if (isset($validated['plan'])) {
             $tenant->plan = $validated['plan'];
