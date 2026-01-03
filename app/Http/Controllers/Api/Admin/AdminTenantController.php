@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Helpers\MailHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SmsCredit;
 use App\Models\Tenant;
 use App\Models\TenantToken;
+use App\Models\User;
 use App\Services\PlanLimit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -72,16 +74,21 @@ class AdminTenantController extends Controller
             'subscription_ends_at' => 'sometimes|date',
         ]);
 
+        $tenantAdmin = User::where('tenant_id', $tenant->id)->where('role', 'admin')->first();
+
         if (isset($validated['plan'])) {
             $tenant->plan = $validated['plan'];
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Plan Updated', 'Your plan has been updated to ' . $validated['plan']);
         }
 
         if (isset($validated['is_active'])) {
             $tenant->is_active = $validated['is_active'];
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Account Status Updated', 'Your account status has been updated to ' . ($validated['is_active'] ? 'Active' : 'Inactive'));
         }
 
         if (isset($validated['subscription_ends_at'])) {
             $tenant->subscription_ends_at = Carbon::parse($validated['subscription_ends_at']);
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Subscription Ends At Updated', 'Your subscription ends at has been updated to ' . $validated['subscription_ends_at']);
         }
 
         $tenant->save();
