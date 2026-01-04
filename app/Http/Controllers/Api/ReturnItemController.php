@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ReturnItem;
 use App\Models\Sale;
 use Carbon\Carbon;
+use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -59,7 +60,7 @@ class ReturnItemController extends Controller
         $data = $request->validate([
             'sale_id' => 'required|exists:sales,id',
             'quantity' => 'required|numeric',
-            'refund_amount' => 'required|numeric',
+            'refund_amount' => 'nullable|numeric',
             'reason' => 'required|string',
             'return_date' => 'required|date',
         ]);
@@ -67,8 +68,19 @@ class ReturnItemController extends Controller
         $sale = Sale::findOrFail($data['sale_id']);
         $this->authorizeTenant($sale);
 
-        if ($data['quantity'] > $sale->quantity) {
-            return response()->json(['error' => 'Return quantity exceeds sale'], 422);
+        $alreadyReturned = ReturnItem::where('sale_id', $sale->id)->sum('quantity');
+
+        $remainingReturnable = $sale->quantity - $alreadyReturned;
+
+        if ($data['quantity'] > $remainingReturnable) {
+            return response()->json([
+                'message' => "Cannot return {$data['quantity']}. Only {$remainingReturnable} remaining on this sale.",
+                'success' => false
+            ], 422);
+        }
+
+        if (!isset($data['refund_amount']) || is_null($data['refund_amount'])) {
+            $data['refund_amount'] = $data['quantity'] * $sale->unit_price;
         }
 
         $data['tenant_id'] = Auth::user()->tenant_id;
@@ -76,9 +88,15 @@ class ReturnItemController extends Controller
         $data['variation'] = $sale->variation;
         $data['customer_id'] = $sale->customer_id;
 
-        $return = ReturnItem::create($data);
+        $returnItem = DB::transaction(function () use ($data, $sale) {
+            $return = ReturnItem::create($data);
 
-        return response()->json($return->load('sale'), 201);
+            // $sale->product->increment('quantity', $data['quantity']);
+
+            return $return;
+        });
+
+        return response()->json($returnItem->load('sale'), 201);
     }
 
     public function show(ReturnItem $returnItem)
