@@ -17,14 +17,16 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $tenantId = Auth::user()->tenant_id;
-        $filter = $request->query('filter', 'overall'); // overall, today, custom
+        $filter = $request->query('filter', 'overall');
         $startDateParam = $request->query('start_date');
         $endDateParam = $request->query('end_date');
 
-        // Create a unique cache key based on filter parameters
-        $cacheKey = "dashboard_stats_tenant_{$tenantId}_{$filter}_{$startDateParam}_{$endDateParam}";
+        // Optional: add specific payment method filter to the query if needed later
+        $paymentMethodFilter = $request->query('payment_method');
 
-        return Cache::remember($cacheKey, now()->addMinutes(1), function () use ($tenantId, $filter, $startDateParam, $endDateParam) {
+        $cacheKey = "dashboard_stats_tenant_{$tenantId}_{$filter}_{$startDateParam}_{$endDateParam}_{$paymentMethodFilter}";
+
+        return Cache::remember($cacheKey, now()->addMinutes(1), function () use ($tenantId, $filter, $startDateParam, $endDateParam, $paymentMethodFilter) {
 
             // Define Date Context
             $startDate = null;
@@ -38,7 +40,7 @@ class DashboardController extends Controller
                 $endDate = Carbon::parse($endDateParam)->endOfDay();
             }
 
-            // 1. Static Stats (Not affected by date filter)
+            // 1. Static Stats
             $totalProducts = Product::where('tenant_id', $tenantId)->count();
             $totalStock = Product::where('tenant_id', $tenantId)->sum('quantity');
 
@@ -48,16 +50,40 @@ class DashboardController extends Controller
                 ->where('quantity', '<', $threshold)
                 ->count();
 
-            // 2. Filtered Stats (Affected by date range)
+            // 2. Filtered Stats
             $salesQuery = Sale::where('tenant_id', $tenantId);
             $returnsQuery = ReturnItem::where('tenant_id', $tenantId);
             $topProductQuery = Sale::where('tenant_id', $tenantId);
 
+            // Apply Global Date Filter
             if ($startDate) {
                 $salesQuery->whereBetween('sale_date', [$startDate, $endDate]);
                 $returnsQuery->whereBetween('return_date', [$startDate, $endDate]);
                 $topProductQuery->whereBetween('sale_date', [$startDate, $endDate]);
             }
+
+            // Apply Payment Method Filter (If user specifically wants to see dashboard for just "Cash")
+            if ($paymentMethodFilter) {
+                $salesQuery->where('payment_method', $paymentMethodFilter);
+                // Returns usually filter by refund_method if filtered by payment method
+                $returnsQuery->where('refund_method', $paymentMethodFilter);
+            }
+
+            /** --- NEW: Payment Method Breakdowns --- **/
+
+            // Group Sales by Payment Method
+            $salesByMethod = (clone $salesQuery)
+                ->selectRaw('payment_method, SUM(total_amount) as total, COUNT(*) as count')
+                ->groupBy('payment_method')
+                ->get();
+
+            // Group Returns by Refund Method
+            $returnsByMethod = (clone $returnsQuery)
+                ->selectRaw('refund_method, SUM(refund_amount) as total, COUNT(*) as count')
+                ->groupBy('refund_method')
+                ->get();
+
+            /** --- END NEW DATA --- **/
 
             $salesAmount = $salesQuery->sum('total_amount');
             $salesCount = $salesQuery->count();
@@ -69,12 +95,10 @@ class DashboardController extends Controller
                 ->orderByDesc('total_sold')
                 ->first();
 
-            // 3. Graph Data (Always show trend for context)
-            // If custom range is long, we show that range. If short/overall, show last 7 days.
+            // 3. Graph Data
             $graphStart = $startDate ?: now()->subDays(6);
             $graphEnd = $endDate ?: now();
 
-            // Limit graph to max 30 days to prevent browser lag
             if ($graphStart->diffInDays($graphEnd) > 30) {
                 $graphStart = $graphEnd->copy()->subDays(30);
             }
@@ -89,7 +113,6 @@ class DashboardController extends Controller
                 ->selectRaw('DATE(return_date) as date, SUM(refund_amount) as total_returns')
                 ->groupBy('date')->get();
 
-            // Generate full date range for chart
             $chartDates = [];
             $tempDate = $graphStart->copy();
             while ($tempDate <= $graphEnd) {
@@ -104,18 +127,21 @@ class DashboardController extends Controller
 
             return response()->json([
                 'total_products' => $totalProducts,
-                'total_stock' => (int) $totalStock,
+                'total_stock' => (float) $totalStock, // Changed to float for "halved" items
                 'sales_amount' => round($salesAmount, 2),
                 'sales_count' => $salesCount,
                 'returns_amount' => round($returnsAmount, 2),
                 'low_stock_count' => $lowStockCount,
                 'top_product' => $topProduct?->product->name ?? 'N/A',
-                'top_product_sold' => $topProduct?->total_sold ?? 0,
+                'top_product_sold' => (float) ($topProduct?->total_sold ?? 0),
                 'currency' => $tenant->settings['currency'] ?? 'GHS',
                 'currency_symbol' => $tenant->settings['currency_symbol'] ?? '₵',
                 'generated_at' => now()->format('Y-m-d H:i'),
                 'graph' => $chartDates,
-                'filter_applied' => $filter
+                'filter_applied' => $filter,
+                // New fields for the UI to render pie charts or list
+                'sales_by_method' => $salesByMethod,
+                'returns_by_method' => $returnsByMethod
             ]);
         });
     }

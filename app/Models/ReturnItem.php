@@ -20,7 +20,8 @@ class ReturnItem extends Model
         'reason',
         'return_date',
         'variation',
-        'customer_id'
+        'customer_id',
+        'refund_method'
     ];
 
     protected $casts = [

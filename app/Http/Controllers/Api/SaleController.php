@@ -44,6 +44,7 @@ class SaleController extends Controller
                 $q->where('notes', 'like', "%{$search}%")
                     ->orWhereHas('product', fn($q2) => $q2->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('customer', fn($q3) => $q3->where('name', 'like', "%{$search}%"))
+                    ->orWhere('payment_method', 'like', "%{$search}%")
                     ->orWhere('total_amount', 'like', "%{$search}%");
             });
         }
@@ -72,6 +73,7 @@ class SaleController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'notes' => 'nullable|string',
             'sale_date' => 'nullable|date',
+            'payment_method' => 'required|string',
         ]);
 
         try {
@@ -91,6 +93,7 @@ class SaleController extends Controller
                         'total_amount' => $item['quantity'] * $item['unit_price'],
                         'notes' => $request->notes,
                         'sale_date' => $saleDate,
+                        'payment_method' => $request->payment_method,
                     ]);
                 }
 
@@ -129,6 +132,7 @@ class SaleController extends Controller
             'unit_price' => 'numeric',
             'notes' => 'nullable|string',
             'sale_date' => 'date',
+            'payment_method' => 'nullable|string',
         ]);
 
         $sale->update($data);

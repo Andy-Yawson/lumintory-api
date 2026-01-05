@@ -39,6 +39,7 @@ class ReturnItemController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('reason', 'like', "%{$search}%")
+                    ->orWhere('refund_method', 'like', "%{$search}%")
                     ->orWhereHas('sale.product', fn($q2) => $q2->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('sale.customer', fn($q3) => $q3->where('name', 'like', "%{$search}%"));
             });
@@ -63,6 +64,7 @@ class ReturnItemController extends Controller
             'refund_amount' => 'nullable|numeric',
             'reason' => 'required|string',
             'return_date' => 'required|date',
+            'refund_method' => 'required|string',
         ]);
 
         $sale = Sale::findOrFail($data['sale_id']);
