@@ -37,7 +37,8 @@ class ReturnsReport implements FromCollection, WithHeadings, WithMapping
             'Refund (GHS)',
             'Reason',
             'Customer',
-            'Sale Date'
+            'Sale Date',
+            'Refund Method'
         ];
     }
 
@@ -52,6 +53,7 @@ class ReturnsReport implements FromCollection, WithHeadings, WithMapping
             $return->reason,
             $return->sale?->customer?->name ?? 'N/A',
             $return->sale?->sale_date,
+            $return->refund_method
         ];
     }
 }
