@@ -143,7 +143,7 @@ class AuthController extends Controller
                 $refTokenReward = $planLimits['referral'] ?? 'basic';
                 $tokensToAward = match ($refTokenReward) {
                     'basic' => 5,
-                    'tiered' => 10,
+                    'pro' => 10,
                     'custom' => 15,
                 };
 
