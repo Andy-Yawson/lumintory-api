@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Models\Category;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -52,8 +53,27 @@ class ProductsImport implements ToCollection, WithHeadingRow
                     }
                 }
 
+                $categoryId = null;
+                if (!empty($row['category'])) {
+                    $categoryName = trim($row['category']);
+
+                    // Case-insensitive search for existing category under this tenant
+                    $category = Category::where('tenant_id', $this->tenantId)
+                        ->where('name', 'LIKE', $categoryName)
+                        ->first();
+
+                    if (!$category) {
+                        $category = Category::create([
+                            'tenant_id' => $this->tenantId,
+                            'name' => $categoryName,
+                        ]);
+                    }
+                    $categoryId = $category->id;
+                }
+
                 Product::create([
                     'tenant_id' => $this->tenantId,
+                    'category_id' => $categoryId,
                     'name' => $row['name'] ?? 'Unnamed Product',
                     'sku' => $row['sku'] ?? null,
                     'description' => $row['description'] ?? null,
