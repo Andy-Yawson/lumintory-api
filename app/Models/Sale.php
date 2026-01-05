@@ -21,7 +21,8 @@ class Sale extends Model
         'notes',
         'sale_date',
         'variation',
-        'customer_id'
+        'customer_id',
+        'payment_method'
     ];
 
     protected $casts = [
