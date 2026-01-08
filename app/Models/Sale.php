@@ -20,14 +20,14 @@ class Sale extends Model
         'total_amount',
         'notes',
         'sale_date',
-        'variation',
         'customer_id',
-        'payment_method'
+        'payment_method',
+        'variation_id'
     ];
 
     protected $casts = [
         'sale_date' => 'date',
-        'variation' => 'array',
+        'variation_id' => 'integer',
     ];
 
     // === TENANT SCOPING ===
@@ -40,20 +40,45 @@ class Sale extends Model
         static::creating(function ($sale) {
             $sale->total_amount = $sale->quantity * $sale->unit_price;
 
-            // Deduct stock
-            $product = Product::find($sale->product_id);
-            if ($product && $sale->quantity <= $product->quantity) {
-                $product->decrement('quantity', $sale->quantity);
+            $product = Product::lockForUpdate()->find($sale->product_id);
+
+            if ($sale->variation_id) {
+                $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
+
+                if (!$variation || $variation->quantity < $sale->quantity) {
+                    throw new \Exception('Insufficient variation stock');
+                }
+
+                $variation->decrement('quantity', $sale->quantity);
+
+                // Also decrement main product quantity
+                if ($product && $product->quantity < $sale->quantity) {
+                    throw new \Exception('Insufficient product stock');
+                }
+                $product?->decrement('quantity', $sale->quantity);
+
             } else {
-                throw new \Exception('Insufficient stock');
+                if (!$product || $product->quantity < $sale->quantity) {
+                    throw new \Exception('Insufficient product stock');
+                }
+
+                $product->decrement('quantity', $sale->quantity);
             }
         });
+
 
         // Restore stock on delete
         static::deleting(function ($sale) {
             $product = Product::find($sale->product_id);
-            if ($product) {
-                $product->increment('quantity', $sale->quantity);
+
+            if ($sale->variation_id) {
+                $variation = ProductVariation::find($sale->variation_id);
+                $variation?->increment('quantity', $sale->quantity);
+
+                // Also restore main product quantity
+                $product?->increment('quantity', $sale->quantity);
+            } else {
+                $product?->increment('quantity', $sale->quantity);
             }
         });
 
@@ -72,7 +97,6 @@ class Sale extends Model
         });
     }
 
-
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
@@ -86,17 +110,18 @@ class Sale extends Model
     // === ACCESSORS ===
     public function getVariationPrice()
     {
-        if (!$this->variation || !is_array($this->variation)) {
-            return $this->unit_price;
-        }
-
-        $variationValue = $this->variation['value'] ?? null;
-        return $this->product?->getVariationPrice($variationValue) ?? $this->unit_price;
+        return $this->variation?->unit_price ?? $this->unit_price;
     }
+
 
 
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function variation()
+    {
+        return $this->belongsTo(ProductVariation::class, 'variation_id');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductVariation;
 use App\Models\Sale;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -23,7 +24,7 @@ class SaleController extends Controller
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
 
-        $query = Sale::with(['product', 'customer'])
+        $query = Sale::with(['product', 'customer', 'variation'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->orderByDesc('sale_date');
 
@@ -67,9 +68,9 @@ class SaleController extends Controller
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|numeric',
-            'items.*.unit_price' => 'required|numeric',
-            'items.*.variation' => 'nullable',
+            'items.*.variation_id' => 'nullable|exists:product_variations,id',
+            'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.unit_price' => 'required|numeric|min:0',
             'customer_id' => 'nullable|exists:customers,id',
             'notes' => 'nullable|string',
             'sale_date' => 'nullable|date',
@@ -86,10 +87,10 @@ class SaleController extends Controller
                     $sales[] = Sale::create([
                         'tenant_id' => $tenantId,
                         'product_id' => $item['product_id'],
+                        'variation_id' => $item['variation_id'] ?? null,
                         'customer_id' => $request->customer_id,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
-                        'variation' => $item['variation'] ?? null,
                         'total_amount' => $item['quantity'] * $item['unit_price'],
                         'notes' => $request->notes,
                         'sale_date' => $saleDate,
@@ -124,34 +125,69 @@ class SaleController extends Controller
     {
         $this->authorizeTenant($sale);
 
-        // Restore original stock
-        $sale->product->increment('quantity', $sale->quantity);
+        // Restore original stock before updating
+        if ($sale->variation_id) {
+            $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
+            $variation?->increment('quantity', $sale->quantity);
+        } else {
+            $product = Product::lockForUpdate()->find($sale->product_id);
+            $product?->increment('quantity', $sale->quantity);
+        }
 
+        // Validate incoming data
         $data = $request->validate([
-            'quantity' => 'numeric',
-            'unit_price' => 'numeric',
+            'quantity' => 'numeric|min:1',
+            'unit_price' => 'numeric|min:0',
+            'variation_id' => 'nullable|exists:product_variations,id',
             'notes' => 'nullable|string',
             'sale_date' => 'date',
             'payment_method' => 'nullable|string',
         ]);
 
+        // Update the sale record
         $sale->update($data);
+
+        // Recalculate total
         $sale->total_amount = $sale->quantity * $sale->unit_price;
         $sale->save();
 
-        // Deduct new stock
-        $sale->product->decrement('quantity', $sale->quantity);
+        // Deduct new stock after update
+        if ($sale->variation_id) {
+            $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
+            if (!$variation || $variation->quantity < $sale->quantity) {
+                throw new \Exception('Insufficient variation stock');
+            }
+            $variation->decrement('quantity', $sale->quantity);
+        } else {
+            $product = Product::lockForUpdate()->find($sale->product_id);
+            if (!$product || $product->quantity < $sale->quantity) {
+                throw new \Exception('Insufficient product stock');
+            }
+            $product->decrement('quantity', $sale->quantity);
+        }
 
-        return $sale;
+        return $sale->load('product', 'variation', 'customer');
     }
+
 
     public function destroy(Sale $sale)
     {
         $this->authorizeTenant($sale);
-        $sale->product->increment('quantity', $sale->quantity); // Restore
+
+        // Restore stock
+        if ($sale->variation_id) {
+            $variation = ProductVariation::find($sale->variation_id);
+            $variation?->increment('quantity', $sale->quantity);
+        } else {
+            $product = Product::find($sale->product_id);
+            $product?->increment('quantity', $sale->quantity);
+        }
+
         $sale->delete();
+
         return response()->json(null, 204);
     }
+
 
     public function receipt(Sale $sale)
     {
