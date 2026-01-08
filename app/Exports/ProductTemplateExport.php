@@ -17,7 +17,7 @@ class ProductTemplateExport implements FromArray, WithHeadings
             'quantity',
             'unit_price',
             'size',
-            'variations', // JSON: e.g. [{"type":"Large","price":110},{"type":"Medium","price":86}]
+            'variations (Format: Name:Price:Stock | Name:Price:Stock)',
         ];
     }
 
@@ -32,7 +32,7 @@ class ProductTemplateExport implements FromArray, WithHeadings
                 50,
                 100,
                 null,
-                '[{"type":"Large","price":110},{"type":"Medium","price":86}]',
+                'Large:110:20 | Medium:86:30',
             ],
         ];
     }
