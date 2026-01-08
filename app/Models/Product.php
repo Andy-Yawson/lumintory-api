@@ -17,7 +17,6 @@ class Product extends Model
         'size',
         'quantity',
         'unit_price',
-        'variations',
         'description',
         'external_id',
         'sku',
@@ -27,8 +26,13 @@ class Product extends Model
     ];
 
     protected $casts = [
-        'variations' => 'array', // Auto-convert JSON to array
+
     ];
+
+    protected $appends = [
+        'computed_quantity',
+    ];
+
 
     // === TENANT SCOPING ===
     protected static function boot()
@@ -92,4 +96,34 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function variations()
+    {
+        return $this->hasMany(ProductVariation::class);
+    }
+
+    public function getComputedQuantityAttribute(): int
+    {
+        // If product has DB variations, sum them
+        if ($this->relationLoaded('variations') || $this->variations()->exists()) {
+            return (int) $this->variations()->sum('quantity');
+        }
+
+        // Otherwise, fall back to product quantity
+        return (int) $this->quantity;
+    }
+
+    public function resolvePrice(?int $variationId = null): float
+    {
+        if ($variationId) {
+            $variation = $this->variations()->find($variationId);
+
+            if ($variation && $variation->unit_price !== null) {
+                return (float) $variation->unit_price;
+            }
+        }
+
+        return (float) $this->unit_price;
+    }
+
 }

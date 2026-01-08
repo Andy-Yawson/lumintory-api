@@ -46,9 +46,9 @@ class DashboardController extends Controller
 
             $tenant = Tenant::find($tenantId);
             $threshold = $tenant?->settings['low_stock_threshold'] ?? 10;
-            $lowStockCount = Product::where('tenant_id', $tenantId)
-                ->where('quantity', '<', $threshold)
-                ->count();
+            // $lowStockCount = Product::where('tenant_id', $tenantId)
+            //     ->where('quantity', '<', $threshold)
+            //     ->count();
 
             // 2. Filtered Stats
             $salesQuery = Sale::where('tenant_id', $tenantId);
@@ -131,7 +131,7 @@ class DashboardController extends Controller
                 'sales_amount' => round($salesAmount, 2),
                 'sales_count' => $salesCount,
                 'returns_amount' => round($returnsAmount, 2),
-                'low_stock_count' => $lowStockCount,
+                // 'low_stock_count' => $lowStockCount,
                 'top_product' => $topProduct?->product->name ?? 'N/A',
                 'top_product_sold' => (float) ($topProduct?->total_sold ?? 0),
                 'currency' => $tenant->settings['currency'] ?? 'GHS',

@@ -20,6 +20,7 @@ class ProductForecast extends Model
         'forecasted_at',
         'reorder_point',
         'safety_stock',
+        'product_variation_id',
     ];
 
     protected $casts = [
