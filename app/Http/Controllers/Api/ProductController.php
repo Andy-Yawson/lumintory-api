@@ -272,27 +272,64 @@ class ProductController extends Controller
 
     public function addStock(Request $request, $id)
     {
+        $product = Product::findOrFail($id);
+
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'nullable|numeric|min:0',
+            'variations' => 'nullable|array'
         ]);
 
         try {
-            return DB::transaction(function () use ($request, $id) {
-                // Find product (Global Scope handles tenant_id check)
-                $product = Product::findOrFail($id);
+            DB::beginTransaction();
 
-                $oldQuantity = $product->quantity;
-                $product->increment('quantity', $request->quantity);
+            $wasUpdated = false;
 
-                return response()->json([
-                    'message' => 'Stock updated successfully',
-                    'product_id' => $product->id,
-                    'new_quantity' => $product->quantity,
-                    'added' => $request->quantity
-                ]);
-            });
+            if ($request->has('variations') && !empty($request->variations)) {
+                foreach ($request->variations as $vId => $addQty) {
+
+                    if (is_null($addQty) || (float) $addQty <= 0) {
+                        continue;
+                    }
+
+                    $variation = $product->variations()->where('id', $vId)->first();
+
+                    if ($variation) {
+                        $variation->increment('quantity', (float) $addQty);
+                        $wasUpdated = true;
+                    }
+                }
+
+                // If any variations were touched, sync the main product's total quantity
+                if ($wasUpdated) {
+                    $product->syncTotalQuantity();
+                }
+            } else if ($request->has('quantity') && (float) $request->quantity > 0) {
+                $product->increment('quantity', (float) $request->quantity);
+                $wasUpdated = true;
+            }
+
+            DB::commit();
+
+            $product->refresh();
+            $product->load('variations');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $wasUpdated ? 'Stock updated successfully' : 'No changes were made',
+                'data' => [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'total_quantity' => $product->quantity,
+                        'variations' => $product->variations
+                    ]
+            ]);
+
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to update stock'], 500);
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Restock failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 

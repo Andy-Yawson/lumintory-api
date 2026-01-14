@@ -126,4 +126,12 @@ class Product extends Model
         return (float) $this->unit_price;
     }
 
+    public function syncTotalQuantity(): void
+    {
+        if ($this->variations()->exists()) {
+            $total = (float) $this->variations()->sum('quantity');
+            $this->update(['quantity' => $total]);
+        }
+    }
+
 }
