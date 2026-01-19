@@ -69,7 +69,7 @@ class SaleController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.variation_id' => 'nullable|exists:product_variations,id',
-            'items.*.quantity' => 'required|numeric|min:1',
+            'items.*.quantity' => 'required',
             'items.*.unit_price' => 'required|numeric|min:0',
             'customer_id' => 'nullable|exists:customers,id',
             'notes' => 'nullable|string',
