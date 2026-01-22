@@ -26,10 +26,10 @@ class ProductForecast extends Model
     protected $casts = [
         'avg_daily_sales' => 'float',
         'predicted_days_to_stockout' => 'float',
-        'current_quantity' => 'integer',
+        'current_quantity' => 'float', // Changed to float for decimal support
+        'reorder_point' => 'float',    // Changed to float for decimal support
+        'safety_stock' => 'float',     // Changed to float for decimal support
         'forecasted_at' => 'datetime',
-        'reorder_point' => 'integer',
-        'safety_stock' => 'integer',
     ];
 
     public function product()

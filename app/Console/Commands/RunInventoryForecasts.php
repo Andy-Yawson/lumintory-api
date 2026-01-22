@@ -15,7 +15,7 @@ class RunInventoryForecasts extends Command
     {
         $windowDays = (int) $this->option('window');
 
-        Tenant::where('is_active', true)->whereIn('plan', ['pro', 'custom'])->chunk(100, function ($tenants) use ($service, $windowDays) {
+        Tenant::where('is_active', 1)->whereIn('plan', ['pro', 'custom'])->chunk(100, function ($tenants) use ($service, $windowDays) {
             foreach ($tenants as $tenant) {
                 $this->info("Forecasting for tenant #{$tenant->id} ({$tenant->name})...");
                 $service->forecastForTenant($tenant->id, $windowDays);
