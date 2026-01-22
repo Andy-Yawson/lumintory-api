@@ -152,13 +152,11 @@ class ProductController extends Controller
             // 2. If variations are present in request
             if ($hasVariations) {
 
-                // Track incoming variation IDs
                 $incomingIds = collect($data['variations'])
                     ->pluck('id')
                     ->filter()
                     ->values();
 
-                // Delete removed variations
                 $product->variations()
                     ->whereNotIn('id', $incomingIds)
                     ->delete();
@@ -166,41 +164,40 @@ class ProductController extends Controller
                 $totalQuantity = 0;
 
                 foreach ($data['variations'] as $variationData) {
+                    $totalQuantity += (float) $variationData['quantity'];
 
-                    $totalQuantity += $variationData['quantity'];
-
-                    // Update existing variation
+                    // FIX: Find the MODEL instance so that $casts are respected
                     if (!empty($variationData['id'])) {
-                        $product->variations()
-                            ->where('id', $variationData['id'])
-                            ->update([
+                        $variation = ProductVariation::find($variationData['id']);
+                        if ($variation) {
+                            $variation->fill([
                                 'name' => $variationData['name'],
-                                'quantity' => $variationData['quantity'],
+                                'quantity' => (float) $variationData['quantity'], // Cast to float explicitly
                                 'unit_price' => $variationData['unit_price'] ?? null,
                                 'sku' => $variationData['sku'] ?? null,
                             ]);
+                            $variation->save();
+                        }
                     }
-                    // Create new variation
+                    // Create new variation via the relation (this uses the model)
                     else {
                         $product->variations()->create([
                             'name' => $variationData['name'],
-                            'quantity' => $variationData['quantity'],
+                            'quantity' => (float) $variationData['quantity'],
                             'unit_price' => $variationData['unit_price'] ?? null,
                             'sku' => $variationData['sku'] ?? null,
                         ]);
                     }
                 }
 
-                // Always sync product quantity
                 $product->update([
                     'quantity' => $totalQuantity
                 ]);
             }
 
-            // 3. No variations → quantity is authoritative
             if (!$hasVariations && array_key_exists('quantity', $data)) {
                 $product->update([
-                    'quantity' => $data['quantity']
+                    'quantity' => (float) $data['quantity']
                 ]);
             }
 
@@ -294,34 +291,29 @@ class ProductController extends Controller
                     $variation = $product->variations()->where('id', $vId)->first();
 
                     if ($variation) {
-                        $variation->increment('quantity', (float) $addQty);
+                        // FIX: Use manual addition instead of increment() for decimals
+                        $variation->quantity = (float) $variation->quantity + (float) $addQty;
+                        $variation->save();
                         $wasUpdated = true;
                     }
                 }
 
-                // If any variations were touched, sync the main product's total quantity
                 if ($wasUpdated) {
                     $product->syncTotalQuantity();
                 }
             } else if ($request->has('quantity') && (float) $request->quantity > 0) {
-                $product->increment('quantity', (float) $request->quantity);
+                // FIX: Manual addition for product too
+                $product->quantity = (float) $product->quantity + (float) $request->quantity;
+                $product->save();
                 $wasUpdated = true;
             }
 
             DB::commit();
 
-            $product->refresh();
-            $product->load('variations');
-
             return response()->json([
                 'status' => 'success',
                 'message' => $wasUpdated ? 'Stock updated successfully' : 'No changes were made',
-                'data' => [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'total_quantity' => $product->quantity,
-                        'variations' => $product->variations
-                    ]
+                'data' => $product->fresh()->load('variations')
             ]);
 
         } catch (\Exception $e) {
