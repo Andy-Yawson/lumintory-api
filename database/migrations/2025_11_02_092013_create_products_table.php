@@ -18,7 +18,6 @@ return new class extends Migration {
             $table->integer('quantity')->default(0);
             $table->decimal('unit_price', 10, 2);
             $table->string('sku')->nullable();
-            $table->json('variations')->nullable();
             $table->text('description')->nullable();
             $table->timestamps();
 
