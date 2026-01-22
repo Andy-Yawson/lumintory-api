@@ -164,7 +164,7 @@ class InventoryForecastService
                 'forecasted_at' => now(),
             ]);
 
-            if (in_array($risk, ['warning', 'critical', 'out_of_stock'])) {
+            if (in_array($risk, ['warning', 'critical'])) {
                 $admins = User::where('tenant_id', $product->tenant_id)
                     ->where('role', 'Administrator')
                     ->where('is_active', true)
@@ -187,10 +187,6 @@ class InventoryForecastService
         if ($exists)
             return;
 
-        /**
-         * Use 'ok' instead of 'inactive' if your database ENUM column 
-         * does not support the 'inactive' value.
-         */
         ProductForecast::create([
             'tenant_id' => $product->tenant_id,
             'product_id' => $product->id,
