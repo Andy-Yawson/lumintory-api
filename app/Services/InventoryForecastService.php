@@ -15,21 +15,21 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryForecastService
 {
-    // 1.64 covers 95% of demand variability (Service Level)
     private const SERVICE_LEVEL_Z_SCORE = 1.64;
 
     public function forecastForTenant(int $tenantId, int $windowDays = 30): void
     {
-        // Optimization: Use chunkById and eager load variations to prevent memory exhaustion
         Product::where('tenant_id', $tenantId)
             ->with(['variations'])
             ->chunkById(100, function ($products) use ($windowDays) {
                 foreach ($products as $product) {
-                    if ($product->variations->isNotEmpty()) {
-                        foreach ($product->variations as $variation) {
+                    $variations = $product->getRelation('variations');
+
+                    if ($variations instanceof Collection && $variations->isNotEmpty()) {
+                        foreach ($variations as $variation) {
                             $this->processForecast(
                                 $product,
-                                (float) $variation->quantity, // Cast decimal correctly
+                                (float) ($variation->quantity ?? 0),
                                 $windowDays,
                                 $variation->id
                             );
@@ -37,7 +37,7 @@ class InventoryForecastService
                     } else {
                         $this->processForecast(
                             $product,
-                            (float) $product->quantity, // Cast decimal correctly
+                            (float) ($product->quantity ?? 0),
                             $windowDays
                         );
                     }
@@ -56,23 +56,21 @@ class InventoryForecastService
         }
 
         // --- STEP 1: CALCULATE WEIGHTED DEMAND ---
-        // We split the window into 3 segments: Recent (last 7), Mid, and Old.
-        // This makes the algorithm smarter about trends (upward or downward).
         $segments = array_chunk(array_reverse($dailySales), 7);
-        $weights = [0.5, 0.3, 0.15, 0.05]; // Give 50% weight to the most recent week
+        $weights = [0.5, 0.3, 0.15, 0.05];
 
         $weightedDemand = 0;
         $activeWeights = 0;
 
         foreach ($segments as $index => $segment) {
-            if (isset($weights[$index])) {
+            if (isset($weights[$index]) && count($segment) > 0) {
                 $weightedDemand += (array_sum($segment) / count($segment)) * $weights[$index];
                 $activeWeights += $weights[$index];
             }
         }
         $adjustedDemand = $weightedDemand / ($activeWeights ?: 1);
 
-        // --- STEP 2: CALCULATE DEMAND VARIABILITY (Standard Deviation) ---
+        // --- STEP 2: CALCULATE DEMAND VARIABILITY ---
         $mean = $totalSales / count($dailySales);
         $variance = 0.0;
         foreach ($dailySales as $sale) {
@@ -82,15 +80,8 @@ class InventoryForecastService
 
         // --- STEP 3: LEAD TIME & SAFETY STOCK ---
         $leadTime = max((float) ($product->lead_time_days ?? 7), 1.0);
-
-        // Safety Stock formula: Z * StdDev * sqrt(LeadTime)
-        // Helps avoid stockouts during demand spikes or supply delays
         $calculatedSafetyStock = self::SERVICE_LEVEL_Z_SCORE * $demandStdDev * sqrt($leadTime);
-
-        // Floor it at 10% of monthly demand or at least a small buffer
         $safetyStock = max($calculatedSafetyStock, ($adjustedDemand * $leadTime * 0.1));
-
-        // Reorder Point (ROP) = (Demand * Lead Time) + Safety Stock
         $reorderPoint = ($adjustedDemand * $leadTime) + $safetyStock;
 
         // --- STEP 4: PREDICTED DAYS TO STOCKOUT ---
@@ -101,9 +92,9 @@ class InventoryForecastService
         if ($currentQty <= 0) {
             $risk = 'out_of_stock';
         } elseif ($daysRemaining <= ($leadTime * 0.5)) {
-            $risk = 'critical'; // Will run out before new stock arrives even if ordered now
+            $risk = 'critical';
         } elseif ($currentQty <= $reorderPoint) {
-            $risk = 'warning'; // Time to reorder
+            $risk = 'warning';
         }
 
         if ($risk !== 'ok') {
@@ -144,7 +135,6 @@ class InventoryForecastService
         $filledSales = [];
         for ($i = 0; $i < $windowDays; $i++) {
             $date = $startDate->copy()->addDays($i)->format('Y-m-d');
-            // Cast to float to support decimal quantities from DB
             $filledSales[] = (float) ($sales[$date] ?? 0.0);
         }
 
@@ -153,7 +143,6 @@ class InventoryForecastService
 
     private function persistAndNotify($product, $risk, $rop, $ss, $avgDemand, $currentQty, $daysLeft, $variationId)
     {
-        // Don't spam: check if we notified about this product/variation risk level in the last 48 hours
         $alreadyNotified = ProductForecast::where('product_id', $product->id)
             ->where('product_variation_id', $variationId)
             ->where('stock_risk_level', $risk)
@@ -175,7 +164,6 @@ class InventoryForecastService
                 'forecasted_at' => now(),
             ]);
 
-            // Only email for serious risks
             if (in_array($risk, ['warning', 'critical', 'out_of_stock'])) {
                 $admins = User::where('tenant_id', $product->tenant_id)
                     ->where('role', 'Administrator')
@@ -199,6 +187,10 @@ class InventoryForecastService
         if ($exists)
             return;
 
+        /**
+         * Use 'ok' instead of 'inactive' if your database ENUM column 
+         * does not support the 'inactive' value.
+         */
         ProductForecast::create([
             'tenant_id' => $product->tenant_id,
             'product_id' => $product->id,
@@ -206,9 +198,10 @@ class InventoryForecastService
             'window_days' => 30,
             'avg_daily_sales' => 0,
             'current_quantity' => $currentQty,
-            'stock_risk_level' => 'inactive',
+            'stock_risk_level' => 'ok',
             'reorder_point' => 0,
             'safety_stock' => 0,
+            'predicted_days_to_stockout' => 999,
             'forecasted_at' => now(),
         ]);
     }

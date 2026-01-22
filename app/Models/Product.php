@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
 class Product extends Model
 {
     use HasFactory;
@@ -26,13 +30,14 @@ class Product extends Model
     ];
 
     protected $casts = [
-
+        'quantity' => 'float',
+        'unit_price' => 'float',
+        'lead_time_days' => 'integer',
     ];
 
     protected $appends = [
         'computed_quantity',
     ];
-
 
     // === TENANT SCOPING ===
     protected static function boot()
@@ -48,43 +53,55 @@ class Product extends Model
     }
 
     // === RELATIONSHIPS ===
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
-    // === ACCESSORS ===
-    public function getLowStockAttribute()
+    public function variations(): HasMany
+    {
+        return $this->hasMany(ProductVariation::class);
+    }
+
+    public function forecasts(): HasMany
+    {
+        return $this->hasMany(ProductForecast::class);
+    }
+
+    public function latestForecast(): HasOne
+    {
+        return $this->hasOne(ProductForecast::class)->latestOfMany('forecasted_at');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    // === ACCESSORS & LOGIC ===
+
+    public function getLowStockAttribute(): bool
     {
         $threshold = $this->tenant?->settings['low_stock_threshold'] ?? 10;
         return $this->quantity < $threshold;
     }
 
+    /**
+     * Updated to use the HasMany relationship instead of 
+     * assuming variations is a JSON array/string attribute.
+     */
     public function getVariationPrice($value)
     {
         $basePrice = $this->unit_price;
 
-        if (!$this->variations || !is_array($this->variations)) {
-            return number_format($basePrice, 2);
-        }
-
-        $variation = collect($this->variations)->first(function ($v) use ($value) {
-            return strtolower($v['value'] ?? '') === strtolower($value);
+        // Use the relationship method to avoid property collision
+        $variation = $this->variations->first(function ($v) use ($value) {
+            return strtolower($v->name ?? '') === strtolower($value);
         });
 
-        $price = $variation['price'] ?? $basePrice;
+        $price = $variation ? $variation->unit_price : $basePrice;
 
         return number_format($price, 2);
-    }
-
-    public function forecasts()
-    {
-        return $this->hasMany(ProductForecast::class);
-    }
-
-    public function latestForecast()
-    {
-        return $this->hasOne(ProductForecast::class)->latestOfMany('forecasted_at');
     }
 
     public function getFormattedPriceAttribute(): string
@@ -92,25 +109,14 @@ class Product extends Model
         return number_format($this->unit_price, 2);
     }
 
-    public function category()
+    public function getComputedQuantityAttribute(): float
     {
-        return $this->belongsTo(Category::class);
-    }
-
-    public function variations()
-    {
-        return $this->hasMany(ProductVariation::class);
-    }
-
-    public function getComputedQuantityAttribute(): int
-    {
-        // If product has DB variations, sum them
-        if ($this->relationLoaded('variations') || $this->variations()->exists()) {
-            return (int) $this->variations()->sum('quantity');
+        // Use count() on relationship to check existence efficiently
+        if ($this->variations()->count() > 0) {
+            return (float) $this->variations()->sum('quantity');
         }
 
-        // Otherwise, fall back to product quantity
-        return (int) $this->quantity;
+        return (float) $this->quantity;
     }
 
     public function resolvePrice(?int $variationId = null): float
@@ -133,5 +139,4 @@ class Product extends Model
             $this->update(['quantity' => $total]);
         }
     }
-
 }
