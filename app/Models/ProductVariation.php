@@ -19,6 +19,10 @@ class ProductVariation extends Model
         'unit_price',
     ];
 
+    protected $casts = [
+        'quantity' => 'decimal:2',
+    ];
+
     protected static function boot()
     {
         parent::boot();

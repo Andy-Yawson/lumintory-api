@@ -28,6 +28,7 @@ class Sale extends Model
     protected $casts = [
         'sale_date' => 'date',
         'variation_id' => 'integer',
+        'quantity' => 'decimal:2',
     ];
 
     // === TENANT SCOPING ===
@@ -49,20 +50,26 @@ class Sale extends Model
                     throw new \Exception('Insufficient variation stock');
                 }
 
-                $variation->decrement('quantity', $sale->quantity);
+                // FIX: Manual subtraction instead of decrement() to support decimals
+                $variation->quantity = $variation->quantity - $sale->quantity;
+                $variation->save();
 
                 // Also decrement main product quantity
-                if ($product && $product->quantity < $sale->quantity) {
-                    throw new \Exception('Insufficient product stock');
+                if ($product) {
+                    if ($product->quantity < $sale->quantity) {
+                        throw new \Exception('Insufficient product stock');
+                    }
+                    $product->quantity = $product->quantity - $sale->quantity;
+                    $product->save();
                 }
-                $product?->decrement('quantity', $sale->quantity);
 
             } else {
                 if (!$product || $product->quantity < $sale->quantity) {
                     throw new \Exception('Insufficient product stock');
                 }
 
-                $product->decrement('quantity', $sale->quantity);
+                $product->quantity = $product->quantity - $sale->quantity;
+                $product->save();
             }
         });
 
@@ -73,26 +80,41 @@ class Sale extends Model
 
             if ($sale->variation_id) {
                 $variation = ProductVariation::find($sale->variation_id);
-                $variation?->increment('quantity', $sale->quantity);
+                if ($variation) {
+                    $variation->quantity = $variation->quantity + $sale->quantity;
+                    $variation->save();
+                }
 
                 // Also restore main product quantity
-                $product?->increment('quantity', $sale->quantity);
+                if ($product) {
+                    $product->quantity = $product->quantity + $sale->quantity;
+                    $product->save();
+                }
             } else {
-                $product?->increment('quantity', $sale->quantity);
+                if ($product) {
+                    $product->quantity = $product->quantity + $sale->quantity;
+                    $product->save();
+                }
             }
         });
 
         static::created(function ($sale) {
             if ($sale->customer_id) {
                 $customer = Customer::find($sale->customer_id);
-                $customer?->increment('total_spent', $sale->total_amount);
+                if ($customer) {
+                    $customer->total_spent = $customer->total_spent + $sale->total_amount;
+                    $customer->save();
+                }
             }
         });
 
         static::deleted(function ($sale) {
             if ($sale->customer_id) {
                 $customer = Customer::find($sale->customer_id);
-                $customer?->decrement('total_spent', $sale->total_amount);
+                if ($customer) {
+                    $customer->total_spent = $customer->total_spent - $sale->total_amount;
+                    $customer->save();
+                }
             }
         });
     }

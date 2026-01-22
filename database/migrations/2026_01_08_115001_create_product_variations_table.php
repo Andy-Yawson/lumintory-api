@@ -17,7 +17,7 @@ return new class extends Migration {
 
             $table->string('name');
             $table->string('sku')->nullable();
-            $table->integer('quantity')->default(0);
+            $table->decimal('quantity')->default(0);
             $table->decimal('unit_price', 10, 2)->nullable();
             $table->timestamps();
 
