@@ -58,47 +58,74 @@ class ReturnItemController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'sale_id' => 'required|exists:sales,id',
-            'quantity' => 'required|numeric',
-            'refund_amount' => 'nullable|numeric',
-            'reason' => 'required|string',
-            'return_date' => 'required|date',
-            'refund_method' => 'required|string',
+        // Support both single return object or bulk returns array
+        $request->validate([
+            'returns' => 'required|array|min:1',
+            'returns.*.sale_id' => 'required|exists:sales,id',
+            'returns.*.quantity' => 'required|numeric|min:0.01',
+            'returns.*.refund_amount' => 'nullable|numeric',
+            'returns.*.reason' => 'required|string',
+            'returns.*.return_date' => 'required|date',
+            'returns.*.refund_method' => 'required|string',
         ]);
 
-        $sale = Sale::findOrFail($data['sale_id']);
-        $this->authorizeTenant($sale);
+        $processedReturns = [];
+        $tenantId = Auth::user()->tenant_id;
 
-        $alreadyReturned = ReturnItem::where('sale_id', $sale->id)->sum('quantity');
+        try {
+            DB::transaction(function () use ($request, $tenantId, &$processedReturns) {
+                foreach ($request->returns as $returnDetail) {
+                    $sale = Sale::findOrFail($returnDetail['sale_id']);
 
-        $remainingReturnable = $sale->quantity - $alreadyReturned;
+                    // Security check
+                    if ($sale->tenant_id !== $tenantId) {
+                        throw new \Exception("Unauthorized access to sale record.");
+                    }
 
-        if ($data['quantity'] > $remainingReturnable) {
+                    // Check availability
+                    $alreadyReturned = ReturnItem::where('sale_id', $sale->id)->sum('quantity');
+                    $remainingReturnable = $sale->quantity - $alreadyReturned;
+
+                    if ($returnDetail['quantity'] > $remainingReturnable) {
+                        throw new \Exception("Item '{$sale->product->name}': Cannot return {$returnDetail['quantity']}. Only {$remainingReturnable} remaining.");
+                    }
+
+                    // Auto-calculate refund if null
+                    // $refundAmount = $returnDetail['refund_amount'] ?? ($returnDetail['quantity'] * $sale->unit_price);
+                    $refundAmount = ($returnDetail['quantity'] * $sale->unit_price);
+
+                    $returnRecord = ReturnItem::create([
+                        'tenant_id' => $tenantId,
+                        'sale_id' => $sale->id,
+                        'product_id' => $sale->product_id,
+                        'variation_id' => $sale->variation_id,
+                        'customer_id' => $sale->customer_id,
+                        'quantity' => $returnDetail['quantity'],
+                        'refund_amount' => $refundAmount,
+                        'reason' => $returnDetail['reason'],
+                        'return_date' => $returnDetail['return_date'],
+                        'refund_method' => $returnDetail['refund_method'],
+                    ]);
+
+                    $sale->product->increment('quantity', $returnDetail['quantity']);
+                    // $sale->delete();
+
+                    $processedReturns[] = $returnRecord;
+                }
+            });
+
             return response()->json([
-                'message' => "Cannot return {$data['quantity']}. Only {$remainingReturnable} remaining on this sale.",
-                'success' => false
+                'success' => true,
+                'message' => count($processedReturns) . ' return(s) processed successfully.',
+                'data' => $processedReturns
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
             ], 422);
         }
-
-        if (!isset($data['refund_amount']) || is_null($data['refund_amount'])) {
-            $data['refund_amount'] = $data['quantity'] * $sale->unit_price;
-        }
-
-        $data['tenant_id'] = Auth::user()->tenant_id;
-        $data['product_id'] = $sale->product_id;
-        $data['variation'] = $sale->variation;
-        $data['customer_id'] = $sale->customer_id;
-
-        $returnItem = DB::transaction(function () use ($data, $sale) {
-            $return = ReturnItem::create($data);
-
-            // $sale->product->increment('quantity', $data['quantity']);
-
-            return $return;
-        });
-
-        return response()->json($returnItem->load('sale'), 201);
     }
 
     public function show(ReturnItem $returnItem)
