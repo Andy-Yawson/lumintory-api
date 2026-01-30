@@ -19,7 +19,7 @@ class ReturnItemController extends Controller
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
 
-        $query = ReturnItem::with(['sale.product', 'sale.customer'])
+        $query = ReturnItem::with(['sale.product', 'sale.customer', 'sale.variation'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->orderByDesc('return_date');
 
@@ -47,8 +47,16 @@ class ReturnItemController extends Controller
 
         $returns = $query->paginate($perPage);
 
+        $items = collect($returns->items())->map(function ($item) {
+            // Ensure the top-level 'variation' attribute reflects the DB relationship if needed
+            if ($item->sale && $item->sale->variation) {
+                $item->variation_details = $item->sale->variation;
+            }
+            return $item;
+        });
+
         return response()->json([
-            'data' => $returns->items(),
+            'data' => $items,
             'current_page' => $returns->currentPage(),
             'last_page' => $returns->lastPage(),
             'total' => $returns->total(),
