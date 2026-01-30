@@ -90,7 +90,7 @@ class InventoryForecastService
         // --- STEP 5: RISK EVALUATION ---
         $risk = 'ok';
         if ($currentQty <= 0) {
-            $risk = 'out_of_stock';
+            $risk = 'critical';
         } elseif ($daysRemaining <= ($leadTime * 0.5)) {
             $risk = 'critical';
         } elseif ($currentQty <= $reorderPoint) {
