@@ -150,21 +150,22 @@ class InventoryForecastService
             ->exists();
 
         if (!$alreadyNotified) {
-            $forecast = ProductForecast::create([
-                'tenant_id' => $product->tenant_id,
-                'product_id' => $product->id,
-                'product_variation_id' => $variationId,
-                'window_days' => 30,
-                'avg_daily_sales' => $avgDemand,
-                'current_quantity' => $currentQty,
-                'stock_risk_level' => $risk,
-                'reorder_point' => $rop,
-                'safety_stock' => $ss,
-                'predicted_days_to_stockout' => $daysLeft,
-                'forecasted_at' => now(),
-            ]);
 
             if (in_array($risk, ['warning', 'critical'])) {
+                $forecast = ProductForecast::create([
+                    'tenant_id' => $product->tenant_id,
+                    'product_id' => $product->id,
+                    'product_variation_id' => $variationId,
+                    'window_days' => 30,
+                    'avg_daily_sales' => $avgDemand,
+                    'current_quantity' => $currentQty,
+                    'stock_risk_level' => $risk,
+                    'reorder_point' => $rop,
+                    'safety_stock' => $ss,
+                    'predicted_days_to_stockout' => $daysLeft,
+                    'forecasted_at' => now(),
+                ]);
+
                 $admins = User::where('tenant_id', $product->tenant_id)
                     ->where('role', 'Administrator')
                     ->where('is_active', true)
