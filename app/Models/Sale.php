@@ -22,7 +22,8 @@ class Sale extends Model
         'sale_date',
         'customer_id',
         'payment_method',
-        'variation_id'
+        'variation_id',
+        'discount'
     ];
 
     protected $casts = [
@@ -39,7 +40,9 @@ class Sale extends Model
 
         // Auto-calculate total & deduct stock on create
         static::creating(function ($sale) {
-            $sale->total_amount = $sale->quantity * $sale->unit_price;
+
+            $sale->total_amount = ($sale->quantity * $sale->unit_price) - ($sale->discount ?? 0);
+            // $sale->total_amount = $sale->quantity * $sale->unit_price;
 
             $product = Product::lockForUpdate()->find($sale->product_id);
 

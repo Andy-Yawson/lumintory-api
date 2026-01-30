@@ -85,6 +85,12 @@ class ReturnItemController extends Controller
                 foreach ($request->returns as $returnDetail) {
                     $sale = Sale::findOrFail($returnDetail['sale_id']);
 
+                    // 1. Calculate Net Price Paid per unit (Total Amount Paid for line item / Quantity bought)
+                    $netPricePerUnit = $sale->total_amount / $sale->quantity;
+
+                    // 2. Default refund is the discounted amount paid
+                    $refundAmount = $returnDetail['refund_amount'] ?? ($returnDetail['quantity'] * $netPricePerUnit);
+
                     // Security check
                     if ($sale->tenant_id !== $tenantId) {
                         throw new \Exception("Unauthorized access to sale record.");
@@ -98,10 +104,6 @@ class ReturnItemController extends Controller
                         throw new \Exception("Item '{$sale->product->name}': Cannot return {$returnDetail['quantity']}. Only {$remainingReturnable} remaining.");
                     }
 
-                    // Auto-calculate refund if null
-                    // $refundAmount = $returnDetail['refund_amount'] ?? ($returnDetail['quantity'] * $sale->unit_price);
-                    $refundAmount = ($returnDetail['quantity'] * $sale->unit_price);
-
                     $returnRecord = ReturnItem::create([
                         'tenant_id' => $tenantId,
                         'sale_id' => $sale->id,
@@ -109,7 +111,7 @@ class ReturnItemController extends Controller
                         'variation_id' => $sale->variation_id,
                         'customer_id' => $sale->customer_id,
                         'quantity' => $returnDetail['quantity'],
-                        'refund_amount' => $refundAmount,
+                        'refund_amount' => round($refundAmount, 2),
                         'reason' => $returnDetail['reason'],
                         'return_date' => $returnDetail['return_date'],
                         'refund_method' => $returnDetail['refund_method'],
