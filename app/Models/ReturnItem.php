@@ -74,4 +74,16 @@ class ReturnItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    public function saleVariation()
+    {
+        return $this->hasOneThrough(
+            ProductVariation::class,
+            Sale::class,
+            'id',
+            'id',
+            'sale_id',
+            'variation_id'
+        );
+    }
 }
