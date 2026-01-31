@@ -36,6 +36,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping
             'Quantity',
             'Unit Price',
             'Total',
+            'Discount',
             'Payment Method',
             'Customer',
             'Notes'
@@ -51,6 +52,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping
             $sale->quantity,
             $sale->unit_price,
             $sale->total_amount,
+            $sale->discount,
             $sale->payment_method,
             $sale->customer?->name ?? 'Walk-in',
             $sale->notes,

@@ -72,6 +72,7 @@ class SaleController extends Controller
             'items.*.quantity' => 'required',
             'items.*.unit_price' => 'required',
             'customer_id' => 'nullable|exists:customers,id',
+            'overall_discount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'sale_date' => 'nullable|date',
             'payment_method' => 'required|string',
@@ -83,7 +84,21 @@ class SaleController extends Controller
                 $saleDate = $request->sale_date ? Carbon::parse($request->sale_date) : now();
                 $tenantId = Auth::user()->tenant_id;
 
+                $overallDiscount = (float) ($request->overall_discount ?? 0);
+
+                // 1. Calculate total gross value to determine proportions
+                $totalGross = collect($request->items)->sum(fn($i) => $i['quantity'] * $i['unit_price']);
+
                 foreach ($request->items as $item) {
+
+                    $itemGross = $item['quantity'] * $item['unit_price'];
+
+                    // 2. Pro-rata distribution
+                    $itemDiscount = 0;
+                    if ($overallDiscount > 0 && $totalGross > 0) {
+                        $itemDiscount = round(($itemGross / $totalGross) * $overallDiscount, 2);
+                    }
+
                     $sales[] = Sale::create([
                         'tenant_id' => $tenantId,
                         'product_id' => $item['product_id'],
@@ -91,6 +106,7 @@ class SaleController extends Controller
                         'customer_id' => $request->customer_id,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
+                        'discount' => $itemDiscount,
                         'total_amount' => $item['quantity'] * $item['unit_price'],
                         'notes' => $request->notes,
                         'sale_date' => $saleDate,
