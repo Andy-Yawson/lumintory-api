@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\AdminTenantController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\GeneralController;
 use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
 use App\Http\Controllers\Api\IntegrationProductController;
@@ -34,7 +35,8 @@ Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestRese
 Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
 Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('sms.callback');
 
-Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
+Route::post('/v1/contact-us', [AuthController::class, 'contactUs']);
+Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail']);
 
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
