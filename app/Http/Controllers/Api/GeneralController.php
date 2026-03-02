@@ -19,7 +19,7 @@ class GeneralController extends Controller
             'username' => 'required|string',
             'password' => 'required|string',
             'from' => 'required|email',
-            'port' => 'integer',
+            'port' => 'nullable|integer',
         ]);
 
         $to = $request->to;
