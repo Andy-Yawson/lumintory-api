@@ -21,6 +21,7 @@ class GeneralController extends Controller
             'from' => 'required|email',
             'port' => 'nullable|integer',
             'encryption' => 'nullable|string',
+            'fromName' => 'nullable|string',
         ]);
 
         $to = $request->to;
@@ -35,6 +36,7 @@ class GeneralController extends Controller
         Config::set('mail.mailers.smtp.password', $request->password);
         Config::set('mail.from.address', $request->from);
         Config::set('mail.mailers.smtp.encryption', $request->encryption ?? 'tls');
+        Config::set('mail.from.name', $request->fromName ?? 'Zinny');
 
 
         Mail::raw($body, function ($message) use ($to, $subject) {
