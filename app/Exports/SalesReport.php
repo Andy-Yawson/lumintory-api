@@ -27,7 +27,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
      */
     public function collection()
     {
-        return Sale::with(['product', 'customer', 'variation', 'user'])
+        return Sale::with(['product', 'customer', 'variation'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->whereBetween('sale_date', [$this->startDate, $this->endDate])
             ->orderBy('sale_date', 'desc')
