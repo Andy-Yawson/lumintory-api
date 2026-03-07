@@ -19,6 +19,9 @@ class GeneralController extends Controller
             'username' => 'required|string',
             'password' => 'required|string',
             'from' => 'required|email',
+            'port' => 'nullable|integer',
+            'encryption' => 'nullable|string',
+            'fromName' => 'nullable|string',
         ]);
 
         $to = $request->to;
@@ -28,10 +31,12 @@ class GeneralController extends Controller
 
         // 1. Override the config values
         Config::set('mail.mailers.smtp.host', $request->host);
-        Config::set('mail.mailers.smtp.port', 587);
+        Config::set('mail.mailers.smtp.port', $request->port ?? 587);
         Config::set('mail.mailers.smtp.username', $request->username);
         Config::set('mail.mailers.smtp.password', $request->password);
         Config::set('mail.from.address', $request->from);
+        Config::set('mail.mailers.smtp.encryption', $request->encryption ?? 'tls');
+        Config::set('mail.from.name', $request->fromName ?? 'Zinny');
 
 
         Mail::raw($body, function ($message) use ($to, $subject) {
