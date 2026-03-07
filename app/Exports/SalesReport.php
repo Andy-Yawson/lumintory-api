@@ -22,11 +22,9 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
         $this->endDate = $endDate;
     }
 
-    /**
-     * Fetching all columns needed for a "Pro" level analysis
-     */
     public function collection()
     {
+        // Ensure we load the variation relationship
         return Sale::with(['product', 'customer', 'variation'])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->whereBetween('sale_date', [$this->startDate, $this->endDate])
@@ -34,9 +32,6 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             ->get();
     }
 
-    /**
-     * Professional Headings
-     */
     public function headings(): array
     {
         return [
@@ -48,53 +43,44 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             'Unit Price (GHS)',
             'Subtotal',
             'Discount',
-            'Tax',
             'Total Amount',
             'Payment Method',
             'Customer',
-            'Sold By',
-            'Status',
             'Notes'
         ];
     }
 
-    /**
-     * Detailed Mapping including variation check and subtotal logic
-     */
     public function map($sale): array
     {
-        // Handle variation name or default to N/A
+        // IMPROVED LOGIC:
+        // 1. Check variation relationship
+        // 2. Fallback to the 'color' column stored directly on the sale
         $variationDisplay = 'N/A';
 
         if ($sale->variation && !empty($sale->variation->name)) {
             $variationDisplay = $sale->variation->name;
+        } elseif (!empty($sale->color)) {
+            $variationDisplay = $sale->color;
         }
 
-        // Calculate subtotal before discount (if your DB stores final total)
-        $subtotal = $sale->total_amount + $sale->discount;
+        $subtotal = $sale->total_amount + ($sale->discount ?? 0);
 
         return [
-            $sale->invoice_number ?? $sale->id, // Use an invoice number if exists
+            $sale->invoice_number ?? $sale->id,
             $sale->sale_date->format('Y-m-d H:i'),
-            $sale->product->name,
+            $sale->product->name ?? 'Unknown',
             $variationDisplay,
             $sale->quantity,
             number_format($sale->unit_price, 2),
             number_format($subtotal, 2),
-            number_format($sale->discount, 2),
-            number_format($sale->tax_amount ?? 0, 2),
+            number_format($sale->discount ?? 0, 2),
             number_format($sale->total_amount, 2),
             ucfirst($sale->payment_method),
             $sale->customer?->name ?? 'Walk-in Customer',
-            $sale->user?->name ?? 'System',
-            $sale->status ?? 'Completed',
             $sale->notes,
         ];
     }
 
-    /**
-     * Style the header row for Excel
-     */
     public function styles(Worksheet $sheet)
     {
         return [
@@ -102,7 +88,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4F46E5'] // Indigo-600
+                    'startColor' => ['rgb' => '4F46E5']
                 ]
             ],
         ];
