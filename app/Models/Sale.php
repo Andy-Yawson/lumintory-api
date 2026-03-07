@@ -145,6 +145,7 @@ class Sale extends Model
 
     public function variation()
     {
-        return $this->belongsTo(ProductVariation::class, 'variation_id');
+        return $this->belongsTo(ProductVariation::class, 'variation_id')
+            ->withoutGlobalScope(TenantScope::class);
     }
 }

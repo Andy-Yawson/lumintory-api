@@ -24,8 +24,11 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
 
     public function collection()
     {
-        // Ensure we load the variation relationship
-        return Sale::with(['product', 'customer', 'variation'])
+        return Sale::with([
+            'product',
+            'customer:id,name',
+            'variation:id,name'
+        ])
             ->where('tenant_id', Auth::user()->tenant_id)
             ->whereBetween('sale_date', [$this->startDate, $this->endDate])
             ->orderBy('sale_date', 'desc')
@@ -52,24 +55,13 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
 
     public function map($sale): array
     {
-        // IMPROVED LOGIC:
-        // 1. Check variation relationship
-        // 2. Fallback to the 'color' column stored directly on the sale
-        $variationDisplay = 'N/A';
-
-        if ($sale->variation && !empty($sale->variation->name)) {
-            $variationDisplay = $sale->variation->name;
-        } elseif (!empty($sale->color)) {
-            $variationDisplay = $sale->color;
-        }
-
         $subtotal = $sale->total_amount + ($sale->discount ?? 0);
 
         return [
             $sale->invoice_number ?? $sale->id,
             $sale->sale_date->format('Y-m-d H:i'),
             $sale->product->name ?? 'Unknown',
-            $variationDisplay,
+            $sale->variation?->name ?? 'N/A',
             $sale->quantity,
             number_format($sale->unit_price, 2),
             number_format($subtotal, 2),

@@ -84,6 +84,6 @@ class ReturnItem extends Model
             'id',
             'sale_id',
             'variation_id'
-        );
+        )->withoutGlobalScopes();
     }
 }
