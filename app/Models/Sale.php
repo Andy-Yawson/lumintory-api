@@ -138,8 +138,6 @@ class Sale extends Model
         return $this->variation?->unit_price ?? $this->unit_price;
     }
 
-
-
     public function customer()
     {
         return $this->belongsTo(Customer::class);

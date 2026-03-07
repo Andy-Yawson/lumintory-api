@@ -43,7 +43,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             'Receipt #',
             'Date/Time',
             'Product Name',
-            'Variation/Color',
+            'Variation',
             'Qty',
             'Unit Price (GHS)',
             'Subtotal',
@@ -64,7 +64,11 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     public function map($sale): array
     {
         // Handle variation name or default to N/A
-        $variationName = $sale->variation ? $sale->variation->name : ($sale->color ?? 'N/A');
+        $variationDisplay = 'N/A';
+
+        if ($sale->variation && !empty($sale->variation->name)) {
+            $variationDisplay = $sale->variation->name;
+        }
 
         // Calculate subtotal before discount (if your DB stores final total)
         $subtotal = $sale->total_amount + $sale->discount;
@@ -73,7 +77,7 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             $sale->invoice_number ?? $sale->id, // Use an invoice number if exists
             $sale->sale_date->format('Y-m-d H:i'),
             $sale->product->name,
-            $variationName,
+            $variationDisplay,
             $sale->quantity,
             number_format($sale->unit_price, 2),
             number_format($subtotal, 2),

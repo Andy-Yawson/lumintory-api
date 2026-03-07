@@ -101,11 +101,31 @@ class ReportController extends Controller
         $this->validateDateRangeForPlan($request);
         $this->ensureFormatAllowed($request);
 
-        $export = new SalesReport($request->start_date, $request->end_date);
+        // Standardize dates to start and end of day for accurate filtering
+        $start = Carbon::parse($request->start_date)->startOfDay();
+        $end = Carbon::parse($request->end_date)->endOfDay();
+
+        $export = new SalesReport($start, $end);
 
         if ($request->format === 'pdf') {
-            $pdf = Pdf::loadView('reports.sales', ['sales' => $export->collection()]);
-            return $pdf->download('sales-report.pdf');
+            // 1. Fetch the data collection from the export class
+            $sales = $export->collection();
+
+            // 2. Calculate summary metrics for the Pro header
+            $summary = [
+                'total_revenue' => $sales->sum('total_amount'),
+                'total_units' => $sales->sum('quantity'),
+                'total_discount' => $sales->sum('discount'),
+                'period' => $start->format('M d, Y') . ' - ' . $end->format('M d, Y')
+            ];
+
+            // 3. Pass BOTH the sales list and the summary stats to the view
+            $pdf = Pdf::loadView('reports.sales', [
+                'sales' => $sales,
+                'summary' => $summary
+            ])->setPaper('a4', 'landscape');
+
+            return $pdf->download('sales-report-' . $request->start_date . '.pdf');
         }
 
         return Excel::download($export, 'sales-report.xlsx');
