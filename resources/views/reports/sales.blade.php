@@ -188,7 +188,7 @@
                     <td>{{ $sale->sale_date->format('d/m/y') }}</td>
                     <td><small>#{{ $sale->invoice_number ?? $sale->id }}</small></td>
                     <td><strong>{{ $sale->product->name }}</strong></td>
-                    <td>{{ $sale->variation?->type ?? 'N/A' }}</td>
+                    <td>{{ $sale->variation?->name ?? 'N/A' }}</td>
                     <td class="text-right">{{ $sale->quantity }}</td>
                     <td class="text-right amount">{{ number_format($sale->unit_price, 2) }}</td>
                     <td class="text-right amount">{{ number_format($sale->total_amount, 2) }}</td>

@@ -66,8 +66,8 @@ class SalesReport implements FromCollection, WithHeadings, WithMapping, ShouldAu
         // Handle variation name or default to N/A
         $variationDisplay = 'N/A';
 
-        if ($sale->variation && !empty($sale->variation->type)) {
-            $variationDisplay = $sale->variation->type;
+        if ($sale->variation && !empty($sale->variation->name)) {
+            $variationDisplay = $sale->variation->name;
         }
 
         // Calculate subtotal before discount (if your DB stores final total)
