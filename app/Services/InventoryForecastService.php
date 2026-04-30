@@ -177,7 +177,7 @@ class InventoryForecastService
                 ->get();
 
             foreach ($admins as $admin) {
-                MailHelper::sendLowStockForecastEmail($admin, $forecast);
+                // MailHelper::sendLowStockForecastEmail($admin, $forecast);
             }
         }
     }
