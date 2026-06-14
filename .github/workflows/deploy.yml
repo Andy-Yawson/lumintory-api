@@ -69,5 +69,6 @@ jobs:
             sudo supervisorctl restart all
 
             sudo php artisan config:clear
+            sudo php artisan cache:clear || true
 
             echo "Deployment completed successfully! 🎉"

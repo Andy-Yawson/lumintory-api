@@ -71,7 +71,6 @@ class SmsService
                 'cost' => $data['data']['cost'] ?? null,
                 'provider_response' => $data,
             ]);
-
         } catch (\Throwable $e) {
             Log::error("SMS provider error", ['error' => $e->getMessage()]);
             $log->update(['status' => 'failed']);
