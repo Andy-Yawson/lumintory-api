@@ -24,7 +24,8 @@ class User extends Authenticatable
         'password',
         'tenant_id',
         'role',
-        'first_login'
+        'first_login',
+        'zinnvy_sub',
     ];
 
     /**

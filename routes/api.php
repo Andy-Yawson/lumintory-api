@@ -25,8 +25,14 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\ZinnvyAuthController;
 use Illuminate\Support\Facades\Route;
 
+
+// --- "Continue with Zinnvy" (OAuth client against Zinnvy Identity) ---
+Route::get('/v1/auth/zinnvy/redirect', [ZinnvyAuthController::class, 'redirect']);
+Route::get('/v1/auth/zinnvy/callback', [ZinnvyAuthController::class, 'callback']);
+Route::post('/v1/auth/zinnvy/handoff', [ZinnvyAuthController::class, 'handoff'])->middleware('throttle:10,1');
 
 Route::post('/v1/login', [AuthController::class, 'login'])->middleware('throttle:3,1');
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
