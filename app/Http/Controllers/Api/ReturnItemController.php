@@ -117,7 +117,8 @@ class ReturnItemController extends Controller
                         'refund_method' => $returnDetail['refund_method'],
                     ]);
 
-                    $sale->product->increment('quantity', $returnDetail['quantity']);
+                    // Stock is restored by ReturnItem's own creating() hook —
+                    // incrementing it here too would double-count it.
                     // $sale->delete();
 
                     $processedReturns[] = $returnRecord;
@@ -147,7 +148,7 @@ class ReturnItemController extends Controller
     public function destroy(ReturnItem $returnItem)
     {
         $this->authorizeTenant($returnItem);
-        $returnItem->product->decrement('quantity', $returnItem->quantity); // Remove from stock
+        // Stock is reversed by ReturnItem's own deleting() hook.
         $returnItem->delete();
         return response()->json(null, 204);
     }

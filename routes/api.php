@@ -41,8 +41,8 @@ Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestRese
 Route::post('/v1/password/reset', [PasswordResetController::class, 'resetPassword']);
 Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('sms.callback');
 
-Route::post('/v1/contact-us', [AuthController::class, 'contactUs']);
-Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail']);
+Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
+Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail'])->middleware('throttle:3,1');
 
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
@@ -70,7 +70,14 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::apiResource('sales', SaleController::class);
 
     Route::post('returns', [ReturnItemController::class, 'store'])->middleware('limit.returns');
-    Route::apiResource('returns', ReturnItemController::class);
+    // Named explicitly: apiResource's default route parameter for
+    // "returns" is {return}, but ReturnItemController's methods type-hint
+    // $returnItem — a mismatched name means Laravel can't bind the route
+    // segment to the model at all, so show()/destroy() silently received a
+    // fresh, empty ReturnItem() (not looked up from the DB), which made
+    // authorizeTenant() reject every request with a 403.
+    Route::apiResource('returns', ReturnItemController::class)
+        ->parameters(['returns' => 'returnItem']);
 
     Route::post('customers', [CustomerController::class, 'store'])->middleware('limit.customers');
     Route::apiResource('customers', CustomerController::class);

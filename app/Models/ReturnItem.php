@@ -35,20 +35,17 @@ class ReturnItem extends Model
         parent::boot();
         static::addGlobalScope(new TenantScope);
 
-        // Auto-add stock back on create
+        // Auto-add stock back on create. This is the ONLY place that
+        // happens — callers (e.g. ReturnItemController::store()) must not
+        // also increment stock themselves, or it gets restored twice.
         static::creating(function ($return) {
-            $product = Product::find($return->product_id);
-            if ($product) {
-                $product->increment('quantity', $return->quantity);
-            }
+            self::adjustStock($return, 1);
         });
 
-        // Deduct stock if return is deleted (rare, but safe)
+        // Deduct stock if return is deleted (rare, but safe) — mirrors
+        // creating() above; not duplicated by callers for the same reason.
         static::deleting(function ($return) {
-            $product = Product::find($return->product_id);
-            if ($product) {
-                $product->decrement('quantity', $return->quantity);
-            }
+            self::adjustStock($return, -1);
         });
 
         static::created(function ($return) {
@@ -57,6 +54,28 @@ class ReturnItem extends Model
                 $customer?->increment('total_returns');
             }
         });
+    }
+
+    /**
+     * Moves stock the same way Sale's boot hooks took it away: when the
+     * original sale was for a specific variation, both that variation's
+     * quantity and the product's aggregate quantity move together — restore
+     * one without the other and Product::computed_quantity (which sums
+     * variations when a product has any) silently disagrees with what was
+     * actually returned. $direction is +1 to give stock back, -1 to take it
+     * away again.
+     */
+    private static function adjustStock(self $return, int $direction): void
+    {
+        $sale = Sale::find($return->sale_id);
+
+        if ($sale?->variation_id) {
+            ProductVariation::find($sale->variation_id)
+                ?->increment('quantity', $direction * $return->quantity);
+        }
+
+        Product::find($return->product_id)
+            ?->increment('quantity', $direction * $return->quantity);
     }
 
     // === RELATIONSHIPS ===
