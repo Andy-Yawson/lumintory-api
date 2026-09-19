@@ -21,6 +21,7 @@ class ProductForecast extends Model
         'reorder_point',
         'safety_stock',
         'product_variation_id',
+        'notified_at',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class ProductForecast extends Model
         'reorder_point' => 'float',    // Changed to float for decimal support
         'safety_stock' => 'float',     // Changed to float for decimal support
         'forecasted_at' => 'datetime',
+        'notified_at' => 'datetime',
     ];
 
     public function product()

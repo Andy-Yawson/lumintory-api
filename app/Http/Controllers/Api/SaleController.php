@@ -141,16 +141,9 @@ class SaleController extends Controller
     {
         $this->authorizeTenant($sale);
 
-        // Restore original stock before updating
-        if ($sale->variation_id) {
-            $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
-            $variation?->increment('quantity', $sale->quantity);
-        } else {
-            $product = Product::lockForUpdate()->find($sale->product_id);
-            $product?->increment('quantity', $sale->quantity);
-        }
-
-        // Validate incoming data
+        // Validate BEFORE touching any stock — a failed validation used to
+        // leave stock already restored with nothing to reverse it, because
+        // there was no transaction and stock mutation happened first.
         $data = $request->validate([
             'quantity' => 'numeric|min:1',
             'unit_price' => 'numeric|min:0',
@@ -160,27 +153,49 @@ class SaleController extends Controller
             'payment_method' => 'nullable|string',
         ]);
 
-        // Update the sale record
-        $sale->update($data);
+        $originalVariationId = $sale->variation_id;
+        $originalQuantity = $sale->quantity;
+        $productId = $sale->product_id;
 
-        // Recalculate total
-        $sale->total_amount = $sale->quantity * $sale->unit_price;
-        $sale->save();
-
-        // Deduct new stock after update
-        if ($sale->variation_id) {
-            $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
-            if (!$variation || $variation->quantity < $sale->quantity) {
-                throw new \Exception('Insufficient variation stock');
+        $sale = DB::transaction(function () use ($sale, $data, $originalVariationId, $originalQuantity, $productId) {
+            // Restore the stock this sale previously held. A variation sale
+            // moves both the variation and the aggregate product quantity
+            // together (mirrors Sale's own creating()/deleting() hooks) —
+            // the old code only ever touched one or the other, so a
+            // variation sale's product-level quantity silently drifted out
+            // of sync on every edit.
+            if ($originalVariationId) {
+                ProductVariation::lockForUpdate()->find($originalVariationId)?->increment('quantity', $originalQuantity);
             }
-            $variation->decrement('quantity', $sale->quantity);
-        } else {
+            Product::lockForUpdate()->find($productId)?->increment('quantity', $originalQuantity);
+
+            $sale->fill($data);
+
+            // Deduct the new stock. Wrapped in the same transaction as the
+            // restore above, so an insufficient-stock exception here rolls
+            // the restore back too instead of leaving stock over-credited.
+            if ($sale->variation_id) {
+                $variation = ProductVariation::lockForUpdate()->find($sale->variation_id);
+                if (!$variation || $variation->quantity < $sale->quantity) {
+                    throw new \Exception('Insufficient variation stock');
+                }
+                $variation->decrement('quantity', $sale->quantity);
+            }
+
             $product = Product::lockForUpdate()->find($sale->product_id);
             if (!$product || $product->quantity < $sale->quantity) {
                 throw new \Exception('Insufficient product stock');
             }
             $product->decrement('quantity', $sale->quantity);
-        }
+
+            // Preserve the sale's existing discount — recalculating from
+            // quantity * unit_price alone silently zeroed it out on every
+            // edit of a discounted sale.
+            $sale->total_amount = ($sale->quantity * $sale->unit_price) - ($sale->discount ?? 0);
+            $sale->save();
+
+            return $sale;
+        });
 
         return $sale->load('product', 'variation', 'customer');
     }

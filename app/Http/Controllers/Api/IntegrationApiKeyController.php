@@ -16,7 +16,8 @@ class IntegrationApiKeyController extends Controller
 
         $keys = IntegrationApiKey::where('tenant_id', $tenantId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(fn (IntegrationApiKey $key) => $this->maskSecret($key));
 
         return response()->json(['data' => $keys]);
     }
@@ -57,7 +58,7 @@ class IntegrationApiKeyController extends Controller
 
         $integrationApiKey->update($data);
 
-        return $integrationApiKey;
+        return $this->maskSecret($integrationApiKey);
     }
 
     public function destroy(IntegrationApiKey $integrationApiKey)
@@ -73,5 +74,20 @@ class IntegrationApiKeyController extends Controller
         if ($key->tenant_id !== Auth::user()->tenant_id) {
             abort(403);
         }
+    }
+
+    /**
+     * The live secret is shown in full exactly once — in store()'s
+     * response, at the moment a tenant creates the key, the same way
+     * Stripe/GitHub reveal a token only on creation. Every other response
+     * masks it; re-sending a live secret on every list/update call would
+     * defeat the point of it being a secret.
+     */
+    protected function maskSecret(IntegrationApiKey $key): array
+    {
+        $data = $key->toArray();
+        $data['secret'] = $key->secret ? '••••••••' . substr($key->secret, -4) : null;
+
+        return $data;
     }
 }
