@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductVariation;
 use Illuminate\Http\Request;
 
 class IntegrationProductController extends Controller
@@ -13,7 +14,8 @@ class IntegrationProductController extends Controller
         $tenant = $request->attributes->get('integration_tenant');
 
         $products = Product::where('tenant_id', $tenant->id)
-            ->select('id', 'name', 'size', 'quantity', 'unit_price', 'variations', 'description')
+            ->select('id', 'external_id', 'name', 'size', 'quantity', 'unit_price', 'description')
+            ->with('variations:id,product_id,external_id,name,sku,quantity,unit_price')
             ->paginate(100);
 
         return response()->json([
@@ -36,8 +38,13 @@ class IntegrationProductController extends Controller
             'products.*.size' => 'nullable|string|max:255',
             'products.*.quantity' => 'required|integer|min:0',
             'products.*.unit_price' => 'required|numeric|min:0',
-            'products.*.variations' => 'nullable|array',
             'products.*.description' => 'nullable|string',
+            'products.*.variations' => 'nullable|array',
+            'products.*.variations.*.external_id' => 'nullable|string|max:255',
+            'products.*.variations.*.name' => 'required_with:products.*.variations|string|max:255',
+            'products.*.variations.*.sku' => 'nullable|string|max:255',
+            'products.*.variations.*.quantity' => 'required_with:products.*.variations|numeric|min:0',
+            'products.*.variations.*.unit_price' => 'nullable|numeric|min:0',
         ]);
 
         $results = [
@@ -47,7 +54,6 @@ class IntegrationProductController extends Controller
         ];
 
         foreach ($payload['products'] as $p) {
-            // We can optionally track an external_id column on Product to map them
             $product = Product::where('tenant_id', $tenant->id)
                 ->when(isset($p['external_id']), function ($q) use ($p) {
                     $q->where('external_id', $p['external_id']);
@@ -60,30 +66,68 @@ class IntegrationProductController extends Controller
                 'size' => $p['size'] ?? null,
                 'quantity' => $p['quantity'],
                 'unit_price' => $p['unit_price'],
-                'variations' => $p['variations'] ?? null,
                 'description' => $p['description'] ?? null,
             ];
+
+            if (isset($p['external_id'])) {
+                $data['external_id'] = $p['external_id'];
+            }
 
             if ($product) {
                 $product->update($data);
                 $results['updated']++;
-                $results['items'][] = [
-                    'id' => $product->id,
-                    'status' => 'updated',
-                ];
+                $status = 'updated';
             } else {
-                if (isset($p['external_id'])) {
-                    $data['external_id'] = $p['external_id'];
-                }
                 $product = Product::create($data);
                 $results['created']++;
-                $results['items'][] = [
-                    'id' => $product->id,
-                    'status' => 'created',
-                ];
+                $status = 'created';
             }
+
+            $variationsSynced = $this->syncVariations($tenant->id, $product, $p['variations'] ?? []);
+
+            $results['items'][] = [
+                'id' => $product->id,
+                'status' => $status,
+                'variations_synced' => $variationsSynced,
+            ];
         }
 
         return response()->json($results);
+    }
+
+    /**
+     * Upserts a product's variants the same way the product itself is
+     * upserted — matched by external_id when the source system provides
+     * one, since that's the only stable key an e-commerce platform's
+     * variant IDs give us across repeated syncs.
+     */
+    private function syncVariations(int $tenantId, Product $product, array $variations): int
+    {
+        $count = 0;
+
+        foreach ($variations as $v) {
+            $variation = ProductVariation::where('tenant_id', $tenantId)
+                ->where('product_id', $product->id)
+                ->when(isset($v['external_id']), fn ($q) => $q->where('external_id', $v['external_id']))
+                ->first();
+
+            $data = [
+                'tenant_id' => $tenantId,
+                'product_id' => $product->id,
+                'name' => $v['name'],
+                'sku' => $v['sku'] ?? null,
+                'quantity' => $v['quantity'],
+                'unit_price' => $v['unit_price'] ?? $product->unit_price,
+            ];
+
+            if (isset($v['external_id'])) {
+                $data['external_id'] = $v['external_id'];
+            }
+
+            $variation ? $variation->update($data) : ProductVariation::create($data);
+            $count++;
+        }
+
+        return $count;
     }
 }

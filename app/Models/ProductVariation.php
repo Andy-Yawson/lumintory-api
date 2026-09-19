@@ -18,7 +18,8 @@ class ProductVariation extends Model
         'sku',
         'quantity',
         'unit_price',
-        'discount_price'
+        'discount_price',
+        'external_id',
     ];
 
     protected $casts = [
