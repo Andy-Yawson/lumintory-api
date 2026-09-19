@@ -15,9 +15,13 @@ class SubscriptionController extends Controller
             'plan' => 'required|in:monthly,yearly,free',
         ]);
 
+        // 'monthly'/'yearly'/'free' describe billing cadence, not a feature
+        // tier — tenants.plan is a DB enum('basic','pro','custom'). Writing
+        // these values into it directly (as this used to) fails at the
+        // database level on every call to anything but 'free'.
         $months = $data['plan'] === 'yearly' ? 12 : 1;
         $tenant->update([
-            'plan' => $data['plan'],
+            'plan' => $data['plan'] === 'free' ? 'basic' : 'pro',
             'subscription_ends_at' => now()->addMonths($months),
             'is_active' => true,
         ]);

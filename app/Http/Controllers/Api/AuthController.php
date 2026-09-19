@@ -188,13 +188,22 @@ class AuthController extends Controller
 
     public function activateSubscription(Request $request)
     {
+        // tenant_id used to be taken from the request body with no check
+        // that it belonged to the caller — any authenticated user of any
+        // tenant could activate (or silently extend/reset) a completely
+        // different tenant's subscription just by guessing an id.
         $validated = $request->validate([
-            'tenant_id' => 'required|exists:tenants,id',
             'plan' => 'required|in:monthly,yearly',
         ]);
 
-        $tenant = Tenant::findOrFail($validated['tenant_id']);
-        $tenant->plan = $validated['plan'];
+        // 'monthly'/'yearly' describe billing cadence, not a feature tier —
+        // tenants.plan is a DB enum('basic','pro','custom'). Writing
+        // 'monthly'/'yearly' into it directly (as this used to) fails at
+        // the database level on every call; this endpoint's job is to
+        // grant the paid (pro) tier, billed at whichever cadence the
+        // caller chose.
+        $tenant = Auth::user()->tenant;
+        $tenant->plan = 'pro';
         $tenant->subscription_ends_at = $validated['plan'] === 'monthly'
             ? now()->addMonth()
             : now()->addYear();
