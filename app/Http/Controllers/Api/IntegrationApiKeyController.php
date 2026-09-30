@@ -40,6 +40,7 @@ class IntegrationApiKeyController extends Controller
                 'products:read',
                 'products:write',
                 'orders:write',
+                'ai:read',
             ],
         ]);
 

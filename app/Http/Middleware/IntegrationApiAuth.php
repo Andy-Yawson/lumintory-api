@@ -11,7 +11,15 @@ class IntegrationApiAuth
 {
     public function handle(Request $request, Closure $next, ...$requiredScopes): Response
     {
+        // Accept the key from either the legacy header or an Authorization Bearer
+        // (Zinnvy AI sends the public_key as a Bearer token).
         $key = $request->header('X-Integration-Key');
+        if (!$key) {
+            $bearer = $request->bearerToken();
+            if ($bearer) {
+                $key = $bearer;
+            }
+        }
 
         if (!$key) {
             return response()->json(['message' => 'Missing API key'], 401);

@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\Admin\AdminBackupController;
+use App\Http\Controllers\Api\Admin\AdminPlanController;
 use App\Http\Controllers\Api\Admin\AdminSubscriptionController;
 use App\Http\Controllers\Api\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Api\Admin\AdminTenantController;
+use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
@@ -13,6 +15,7 @@ use App\Http\Controllers\Api\IntegrationApiKeyController;
 use App\Http\Controllers\Api\IntegrationOrderController;
 use App\Http\Controllers\Api\IntegrationProductController;
 use App\Http\Controllers\Api\PasswordResetController;
+use App\Http\Controllers\Api\PlanController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\ReturnItemController;
@@ -25,6 +28,7 @@ use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\TokenController;
+use App\Http\Controllers\Api\ZinnvyAiController;
 use App\Http\Controllers\Api\ZinnvyAuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +47,9 @@ Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('
 
 Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
 Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail'])->middleware('throttle:3,1');
+
+// Public: available plans for tenant upgrade page
+Route::get('/v1/plans', [PlanController::class, 'index']);
 
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
@@ -124,7 +131,18 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
 });
 
-// ------ Custom API Produuct and Order sync ------
+// ------ Zinnvy AI read endpoints (P4-B) ------
+Route::prefix('v1/integrations/ai')->middleware(['integration.auth:ai:read'])->group(function () {
+    Route::get('/ping', [ZinnvyAiController::class, 'ping']);
+    Route::get('/stock', [ZinnvyAiController::class, 'stock']);
+    Route::get('/products/search', [ZinnvyAiController::class, 'searchProducts']);
+    Route::get('/reports/low-stock', [ZinnvyAiController::class, 'lowStock']);
+    Route::get('/reports/slow-movers', [ZinnvyAiController::class, 'slowMovers']);
+    Route::get('/reports/sales-summary', [ZinnvyAiController::class, 'salesSummary']);
+    Route::get('/customers/purchases', [ZinnvyAiController::class, 'customerPurchases']);
+});
+
+// ------ Custom API Product and Order sync ------
 Route::prefix('v1/integrations')->middleware('integration.auth')->group(function () {
     // Products
     Route::get('/products', [IntegrationProductController::class, 'index'])->middleware('integration.auth:products:read');
@@ -171,6 +189,18 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fun
     Route::get('/backups', [AdminBackupController::class, 'index']);
     Route::post('/backups', [AdminBackupController::class, 'store']);
     Route::get('/backups/{backup}/download', [AdminBackupController::class, 'download']);
+
+    // Plans (pricing + limits — admin-editable)
+    Route::get('/plans', [AdminPlanController::class, 'index']);
+    Route::post('/plans', [AdminPlanController::class, 'store']);
+    Route::put('/plans/{plan}', [AdminPlanController::class, 'update']);
+    Route::delete('/plans/{plan}', [AdminPlanController::class, 'destroy']);
+    Route::post('/tenants/{tenant}/assign-plan', [AdminPlanController::class, 'assignToTenant']);
+
+    // All users across tenants
+    Route::get('/users', [AdminUserController::class, 'index']);
+    Route::put('/users/{user}', [AdminUserController::class, 'update']);
+    Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
 
     Route::post('/add-user', [AuthController::class, 'addUserAdmin']);
 
