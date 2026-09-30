@@ -123,6 +123,9 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::patch('/support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus']);
 
 
+    // ----- Zinnvy AI "Connect with Zinnvy" provisioning (P4-C) -----
+    Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision']);
+
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);
     Route::post('/integration-keys', [IntegrationApiKeyController::class, 'store']);
