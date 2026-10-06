@@ -26,6 +26,8 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\StoreConnectionController;
+use App\Http\Controllers\Api\StoreWebhookController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\ZinnvyAiController;
@@ -48,6 +50,12 @@ Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('
 Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
 Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail'])->middleware('throttle:3,1');
 
+// --- Online stores: provider callbacks + webhooks (public; verified by signature / one-time state) ---
+Route::get('/v1/stores/shopify/callback', [StoreConnectionController::class, 'shopifyCallback']);
+Route::post('/v1/stores/woocommerce/callback', [StoreConnectionController::class, 'wooCallback'])->middleware('throttle:30,1');
+Route::post('/v1/webhooks/shopify', [StoreWebhookController::class, 'shopify']);
+Route::post('/v1/webhooks/woocommerce/{uuid}', [StoreWebhookController::class, 'woocommerce']);
+
 // Public: available plans for tenant upgrade page
 Route::get('/v1/plans', [PlanController::class, 'index']);
 
@@ -68,6 +76,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('products/low-stock', [ProductController::class, 'lowStock']);
     Route::apiResource('products', ProductController::class);
     Route::get('products/import/template', [ProductController::class, 'downloadTemplate']);
+    Route::post('products/import/preview', [ProductController::class, 'importPreview']);
     Route::post('products/import', [ProductController::class, 'import']);
     Route::post('products/{id}/add-stock', [ProductController::class, 'addStock']);
 
@@ -125,6 +134,16 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     // ----- Zinnvy AI "Connect with Zinnvy" provisioning (P4-C) -----
     Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision']);
+
+    //----- Online stores (Shopify / WooCommerce) ------
+    Route::get('/stores', [StoreConnectionController::class, 'index']);
+    Route::middleware('feature:shopify_woo')->group(function () {
+        Route::post('/stores/shopify/connect', [StoreConnectionController::class, 'shopifyConnect']);
+        Route::post('/stores/woocommerce/connect', [StoreConnectionController::class, 'wooConnect']);
+        Route::post('/stores/woocommerce/keys', [StoreConnectionController::class, 'wooKeys']);
+        Route::post('/stores/{connection}/sync', [StoreConnectionController::class, 'sync']);
+    });
+    Route::delete('/stores/{connection}', [StoreConnectionController::class, 'destroy']);
 
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);

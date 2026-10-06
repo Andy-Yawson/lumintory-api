@@ -19,6 +19,7 @@ class Sale extends Model
         'unit_price',
         'total_amount',
         'notes',
+        'external_order_id',
         'sale_date',
         'customer_id',
         'payment_method',

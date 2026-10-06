@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Exports\ProductTemplateExport;
 use App\Http\Controllers\Controller;
-use App\Imports\ProductsImport;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Services\PlanLimit;
+use App\Services\ProductImportService;
 use DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -223,48 +223,92 @@ class ProductController extends Controller
         return Excel::download(new ProductTemplateExport, $fileName);
     }
 
-    public function import(Request $request)
+    /**
+     * Step 1 of the guided import: read the file and tell the client what's in
+     * it — headers, a few sample rows and our best guess at which column is
+     * which — so the person can confirm the mapping instead of reshaping
+     * their spreadsheet to match ours.
+     */
+    public function importPreview(Request $request)
     {
-        $request->validate([
-            'file' => 'required|file|mimes:xlsx,xls,csv',
-        ]);
+        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240']);
 
-        $tenantId = Auth::user()->tenant_id;
+        [$headers, $rows] = $this->readSpreadsheet($request->file('file'));
 
-        $limit = PlanLimit::getLimit(Auth::user()->tenant, 'products') ?? null;
-
-        if ($limit !== null) {
-            // Quick pre-read to count rows (excluding heading row)
-            $rowCount = Excel::toCollection(null, $request->file('file'))[0]
-                ->skip(1) // skip heading row
-                ->count();
-
-            if ($rowCount > $limit) {
-                return response()->json([
-                    'error' => true,
-                    'message' => "Your plan allows importing a maximum of {$limit} rows per file. You tried to import {$rowCount} rows.",
-                ], 422);
-            }
+        if (empty($headers)) {
+            return response()->json(['message' => 'That file looks empty.'], 422);
         }
-
-
-        if ($limit !== null) {
-            $currentCount = Product::where('tenant_id', $tenantId)->count();
-
-            if ($currentCount >= $limit) {
-                return response()->json([
-                    'error' => true,
-                    'message' => "You have reached your product limit ({$limit}) for your current plan. Please delete some products or upgrade your plan.",
-                ], 422);
-            }
-        }
-
-        // Let’s pass tenant id into the import class
-        Excel::import(new ProductsImport($tenantId, $limit), $request->file('file'));
 
         return response()->json([
-            'message' => 'Products imported successfully',
+            'headers' => $headers,
+            'sample' => array_slice($rows, 0, 5),
+            'total_rows' => count($rows),
+            'fields' => ProductImportService::fieldCatalogue(),
+            'suggested_mapping' => (object) ProductImportService::suggestMapping($headers),
+            'row_limit' => PlanLimit::getLimit(Auth::user()->tenant, 'excel_import_rows'),
         ]);
+    }
+
+    public function import(Request $request, ProductImportService $importer)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            'mapping' => 'nullable|string',
+            'duplicates' => 'nullable|in:skip,update',
+        ]);
+
+        $tenant = Auth::user()->tenant;
+        [$headers, $rows] = $this->readSpreadsheet($request->file('file'));
+
+        $mapping = $request->filled('mapping')
+            ? array_map('intval', array_filter((array) json_decode($request->input('mapping'), true), fn ($v) => $v !== null && $v !== ''))
+            : ProductImportService::suggestMapping($headers);
+
+        if (! isset($mapping['name'])) {
+            return response()->json(['error' => true, 'message' => 'Choose which column holds the product name.'], 422);
+        }
+
+        $rowLimit = PlanLimit::getLimit($tenant, 'excel_import_rows');
+        if ($rowLimit !== null && count($rows) > $rowLimit) {
+            return response()->json([
+                'error' => true,
+                'message' => "Your plan allows importing up to {$rowLimit} rows per file. This file has " . count($rows) . '.',
+            ], 422);
+        }
+
+        $result = $importer->import(
+            $tenant->id,
+            PlanLimit::getLimit($tenant, 'products'),
+            $rows,
+            $mapping,
+            $request->input('duplicates', 'skip'),
+        );
+
+        $parts = array_filter([
+            $result['created'] ? "{$result['created']} added" : null,
+            $result['updated'] ? "{$result['updated']} updated" : null,
+            $result['skipped'] ? "{$result['skipped']} skipped" : null,
+            $result['failed'] ? "{$result['failed']} failed" : null,
+        ]);
+
+        return response()->json($result + ['message' => $parts ? implode(', ', $parts) : 'Nothing to import']);
+    }
+
+    /** @return array{0: array<int,string>, 1: array<int, array<int,mixed>>} headers, data rows */
+    private function readSpreadsheet($file): array
+    {
+        $sheet = Excel::toArray(null, $file)[0] ?? [];
+        $headerRow = array_shift($sheet) ?? [];
+
+        $headers = [];
+        foreach ($headerRow as $i => $h) {
+            $h = trim((string) $h);
+            $headers[] = $h !== '' ? $h : 'Column ' . ($i + 1);
+        }
+
+        $rows = array_values(array_filter($sheet, fn ($r) => collect($r)->contains(fn ($v) => $v !== null && trim((string) $v) !== '')));
+
+        return [$headers, $rows];
     }
 
     public function addStock(Request $request, $id)

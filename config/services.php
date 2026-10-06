@@ -31,4 +31,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Public URL of the Inventory web app; OAuth callbacks send people back here.
+    'frontend_url' => env('FRONTEND_URL'),
+
+    'shopify' => [
+        'client_id' => env('SHOPIFY_CLIENT_ID'),
+        'client_secret' => env('SHOPIFY_CLIENT_SECRET'),
+        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_inventory,read_orders'),
+        'api_version' => env('SHOPIFY_API_VERSION', '2026-07'),
+    ],
+
 ];

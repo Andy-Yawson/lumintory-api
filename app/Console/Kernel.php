@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('inventory:forecast --window=30')->everyThreeHours();
         $schedule->command('app:credit-remainder')->hourly();
+        $schedule->command('stores:sync')->hourly();
     }
 
 
