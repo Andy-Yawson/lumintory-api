@@ -32,6 +32,9 @@ class DemoWorld
 
     private int $created = 0;
 
+    /** The owner's real identity, kept across a DEMO_RESEED purge (deleting a tenant cascades to its users). */
+    private ?array $preserved = null;
+
     public function __construct(
         private readonly ?string $password,
         private readonly ?string $ownerEmail,
@@ -44,6 +47,10 @@ class DemoWorld
         $ids = Tenant::where('domain', 'like', '%'.self::DOMAIN_SUFFIX)->pluck('id');
         if ($ids->isEmpty()) {
             return;
+        }
+
+        if ($this->ownerEmail && ($owner = User::where('email', $this->ownerEmail)->whereIn('tenant_id', $ids)->first())) {
+            $this->preserved = ['name' => $owner->name, 'zinnvy_sub' => $owner->zinnvy_sub];
         }
 
         DB::transaction(function () use ($ids) {
@@ -134,6 +141,50 @@ class DemoWorld
         $this->logins[] = ['email' => $email, 'role' => $role, 'tenant' => $tenant->name, 'password' => $password];
 
         return $user;
+    }
+
+    /**
+     * DEMO_OWNER_EMAIL becomes an Administrator of Ama's Market, so a real Zinnvy sign-in
+     * lands in the fully populated workspace. Works whether or not the demo tenants already
+     * exist, and never resets anyone's password.
+     *
+     * An email is a single Inventory user, so if that person already belongs to ANOTHER
+     * workspace they are MOVED here (that workspace and its data stay, but lose that
+     * administrator). A SuperAdmin is never moved.
+     */
+    public function attachOwner(): void
+    {
+        $ama = $this->tenants['ama-market'] ?? null;
+        if (! $this->ownerEmail || ! $ama) {
+            return;
+        }
+
+        $user = User::where('email', $this->ownerEmail)->first();
+
+        if (! $user) {
+            $owner = $this->makeUser($ama, $this->preserved['name'] ?? 'Workspace Owner', 'owner', 'Administrator', $this->ownerEmail);
+            if ($this->preserved) {
+                $owner->forceFill(['zinnvy_sub' => $this->preserved['zinnvy_sub']])->save(); // stays linked to their Zinnvy account
+            }
+            $this->command?->info("  + {$this->ownerEmail} added as Administrator of {$ama->name}");
+
+            return;
+        }
+
+        if ($user->tenant_id === $ama->id) {
+            return;
+        }
+
+        if ($user->role === 'SuperAdmin') {
+            $this->command?->warn("  ! {$this->ownerEmail} is a SuperAdmin; not moved into {$ama->name}.");
+
+            return;
+        }
+
+        $from = $user->tenant_id;
+        $user->forceFill(['tenant_id' => $ama->id, 'role' => 'Administrator', 'first_login' => false])->save();
+        $user->tokens()->delete(); // next sign-in resolves the new workspace
+        $this->command?->warn("  ~ {$this->ownerEmail} MOVED from workspace #{$from} into {$ama->name}. To undo: UPDATE users SET tenant_id = {$from} WHERE email = '{$this->ownerEmail}';");
     }
 
     public function ownerEmail(): ?string

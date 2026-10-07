@@ -22,13 +22,15 @@ use Illuminate\Support\Facades\DB;
  * Optional environment:
  *   DEMO_PASSWORD     password for every demo user (otherwise a random one per
  *                     user is generated and printed once — never a default)
- *   DEMO_OWNER_EMAIL  also adds this email as an Administrator of "Ama's Market",
- *                     so "Continue with Zinnvy" (which links by verified email)
- *                     lands in a fully populated workspace
+ *   DEMO_OWNER_EMAIL  makes this email an Administrator of "Ama's Market" (even if the demo
+ *                     tenants already exist), so "Continue with Zinnvy" (which links by
+ *                     verified email) lands in a fully populated workspace. If that email
+ *                     already belongs to another workspace the user is MOVED (see DemoWorld::attachOwner)
  *   DEMO_RESEED=true  wipe the demo tenants first and rebuild them with fresh dates
  *
  * It is idempotent: demo tenants are recognised by their `*.demo.zinnvy.test`
- * domain and are skipped when they already exist. It never touches other tenants.
+ * domain and are skipped when they already exist. It never touches other tenants' data;
+ * the one exception is DEMO_OWNER_EMAIL's user, who may be moved into the demo workspace.
  */
 class StagingSeeder extends Seeder
 {
@@ -60,6 +62,7 @@ class StagingSeeder extends Seeder
                     $world->tenant($profile);
                 }
 
+                $world->attachOwner();
                 $world->linkReferrals();
                 $world->backups();
             });

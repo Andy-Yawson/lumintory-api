@@ -93,10 +93,6 @@ class DemoTenantBuilder
             $invitee->forceFill(['first_login' => true])->save();
             $this->users[] = $invitee;
         }
-
-        if (($this->p['owner'] ?? false) && $this->world->ownerEmail()) {
-            $this->users[] = $this->world->makeUser($this->tenant, 'Workspace Owner', 'owner', 'Administrator', $this->world->ownerEmail());
-        }
     }
 
     private function customers(): void

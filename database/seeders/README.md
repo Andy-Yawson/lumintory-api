@@ -16,7 +16,7 @@ returns follow the app's own rules. It touches **every model table**.
 * `DatabaseSeeder` is intentionally empty — production runs `db:seed` on every deploy.
 * `StagingSeeder` does nothing unless `SEED_DEMO_DATA=true` is in the process environment.
 * The deploy workflow sets that **inline, only when the branch is `develop`** (see `.github/workflows/deploy.yml`).
-* Demo users all live at `*@demo.zinnvy.test`; demo tenants at `*.demo.zinnvy.test`. Other tenants are never touched.
+* Demo users all live at `*@demo.zinnvy.test`; demo tenants at `*.demo.zinnvy.test`. Other tenants' data is never touched (the only exception is `DEMO_OWNER_EMAIL`'s user, below).
 
 ## Passwords
 
@@ -24,8 +24,15 @@ There is **no default password**. Set a `DEMO_PASSWORD` repository secret, or le
 a random password per user is generated and printed once in the deploy log.
 The demo set includes a SuperAdmin on an internet-reachable staging API, so use a strong secret.
 
-Optional secret `DEMO_OWNER_EMAIL`: also adds that email as an Administrator of Ama's Market, so
+Optional secret `DEMO_OWNER_EMAIL`: makes that email an Administrator of Ama's Market, so
 "Continue with Zinnvy" (which links by verified email) lands in a fully populated workspace.
+It works whether or not the demo tenants already exist, and never resets a password.
+
+An email is a single Inventory user, so **if that email already belongs to another workspace, the user
+is moved** into Ama's Market (that workspace and its data stay, but lose that administrator).
+A SuperAdmin is never moved, and a `DEMO_RESEED` keeps the owner's name and Zinnvy link.
+The deploy log prints the exact undo, e.g.
+`UPDATE users SET tenant_id = <original workspace id> WHERE email = '<email>';`
 
 ## Running it
 
