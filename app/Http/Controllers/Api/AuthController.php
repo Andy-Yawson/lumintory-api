@@ -65,127 +65,17 @@ class AuthController extends Controller
         return $request->user()->load('tenant');
     }
 
+    /**
+     * Retired: every registration now starts at Zinnvy Identity ("Continue with Zinnvy"),
+     * so Inventory no longer creates password accounts. Kept as a clear 410 for old clients.
+     */
     public function registerTenant(Request $request)
     {
-        $validated = $request->validate([
-            'tenant_name' => 'required|string|max:255',
-            'user_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
-            'ref' => 'nullable|string',
-            'website' => 'nullable|string|max:255',
-            'currency' => 'nullable|string|max:10',
-            'currency_symbol' => 'nullable|string|max:10',
-        ]);
-
-        // If honeypot field is filled, silently reject
-        if (!empty($validated['website'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid submission.',
-            ], 422);
-        }
-
-        $currency = $validated['currency'] ?? 'GHS';
-        $currencySymbol = $validated['currency_symbol'] ?? 'GHS';
-
-
-        // Create tenant
-        $tenant = Tenant::create([
-            'name' => $validated['tenant_name'],
-            'domain' => null,
-            'plan' => 'pro',
-            'is_active' => true,
-            'subscription_ends_at' => Carbon::now()->addYear(),
-            'settings' => [
-                'currency' => $currency,
-                'currency_symbol' => $currencySymbol,
-            ],
-        ]);
-
-        $initialSms = PlanLimit::getLimit($tenant, 'sms');
-
-        SmsCredit::create([
-            'tenant_id' => $tenant->id,
-            'credits' => $initialSms,
-        ]);
-
-        // Create user
-        $user = User::create([
-            'name' => $validated['user_name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'tenant_id' => $tenant->id,
-            'role' => 'Administrator',
-        ]);
-
-        SubscriptionHistory::create([
-            'tenant_id' => $tenant->id,
-            'from_plan' => 'basic',
-            'to_plan' => $tenant->plan,
-            'event_type' => 'signup',
-            'amount' => null,
-            'currency' => $currency,
-            'effective_at' => now(),
-            'meta' => [
-                'source' => 'self_signup',
-            ],
-        ]);
-
-        // ----------- REFERRAL ------------
-        if (!empty($validated['ref'])) {
-            $referrerTenant = Tenant::where('referral_code', $validated['ref'])->first();
-
-            if ($referrerTenant && $referrerTenant->id !== $tenant->id) {
-
-                $tenant->referred_by_tenant_id = $referrerTenant->id;
-                $tenant->save();
-
-                $refTokenReward = $planLimits['referral'] ?? 'basic';
-                $tokensToAward = match ($refTokenReward) {
-                    'basic' => 5,
-                    'pro' => 10,
-                    'custom' => 15,
-                };
-
-                TokenTransaction::create([
-                    'tenant_id' => $referrerTenant->id,
-                    'amount' => $tokensToAward,
-                    'type' => 'earn',
-                    'source' => 'referral',
-                    'meta' => [
-                        'referred_tenant_id' => $tenant->id,
-                    ],
-                ]);
-
-                $tt = TenantToken::where('tenant_id', $referrerTenant->id)->first();
-                $tt->update([
-                    'balance' => $tt->balance + $tokensToAward
-                ]);
-
-                Referral::create([
-                    'referrer_tenant_id' => $referrerTenant->id,
-                    'referred_tenant_id' => $tenant->id,
-                    'tokens_awarded' => $tokensToAward,
-                ]);
-            }
-        }
-        // ------------------------------------------------
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        foreach (["yawsonandrews@gmail.com", "ugin.dev@gmail.com"] as $email) {
-            MailHelper::sendEmailNotification($email, "New tenant signed up: {$tenant->name}", "You have one new tenant registered.\n \n\nRegards,\nZinnvy.");
-        }
-
         return response()->json([
-            'message' => 'Tenant registered successfully. Please activate subscription.',
-            'tenant' => $tenant->fresh(),
-            'user' => $user,
-            'token' => $token,
-        ], 201);
+            'success' => false,
+            'message' => 'Registration now happens through Zinnvy. Use "Continue with Zinnvy" to create your account and workspace.',
+        ], 410);
     }
-
 
     public function activateSubscription(Request $request)
     {

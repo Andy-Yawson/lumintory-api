@@ -4,27 +4,31 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\WorkspaceProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 /**
- * "Continue with Zinnvy" — this app acting as an OAuth *client* against
- * Zinnvy Identity (accounts.zinnvy.com). Deliberately conservative for a
- * first pass: it signs in an existing Inventory user whose email matches a
- * verified Zinnvy account, but it does NOT auto-provision a new tenant for
- * an unrecognised email — that's a product decision (self-signup vs.
- * invite-only) this endpoint shouldn't make unilaterally. Someone with no
- * matching account is sent back to the frontend with an error to explain
- * that plainly rather than silently creating a tenant on their behalf.
+ * "Continue with Zinnvy" — this app acting as an OAuth *client* against Zinnvy Identity
+ * (accounts.zinnvy.com). Identity owns every account and every sign-up:
+ *
+ *  - an Inventory user whose email matches a verified Zinnvy account is signed in
+ *    (invited teammates are linked by email on their first sign-in);
+ *  - a verified Zinnvy account with NO Inventory workspace is handed to the sign-up
+ *    step (signupInfo / completeSignup), which only asks for the business name and
+ *    currency and then creates the workspace linked to that Zinnvy account.
+ *
+ * Inventory never creates credentials of its own for anyone.
  */
 class ZinnvyAuthController extends Controller
 {
-    public function redirect()
+    public function redirect(Request $request)
     {
         $state = Str::random(40);
-        Cache::put("zinnvy_oauth_state:{$state}", true, now()->addMinutes(10));
+        // `ref` (a referral code from /register?ref=…) rides along so a brand-new workspace can credit the referrer.
+        Cache::put("zinnvy_oauth_state:{$state}", ['ref' => $request->query('ref')], now()->addMinutes(30));
 
         $query = http_build_query([
             'client_id' => config('zinnvy.client_id'),
@@ -42,7 +46,8 @@ class ZinnvyAuthController extends Controller
         $frontend = config('zinnvy.frontend_callback_url');
 
         $state = $request->query('state');
-        if (! $state || ! Cache::pull("zinnvy_oauth_state:{$state}")) {
+        $stateData = $state ? Cache::pull("zinnvy_oauth_state:{$state}") : null;
+        if (! $stateData) {
             return redirect("{$frontend}?error=invalid_state");
         }
 
@@ -91,13 +96,23 @@ class ZinnvyAuthController extends Controller
             }
         }
 
-        if (! $user && ! $emailVerified && User::where('email', $email)->exists()) {
-            // Invited here, but their Zinnvy email isn't verified yet — say so instead of "no account".
+        if (! $user && ! $emailVerified) {
+            // Never link an invite, and never create a workspace, on an email Zinnvy hasn't verified:
+            // that would let someone claim an address they don't own.
             return redirect("{$frontend}?error=email_unverified&email=".urlencode($email));
         }
 
         if (! $user) {
-            return redirect("{$frontend}?error=no_account&email=".urlencode($email));
+            // Verified at Zinnvy, but no workspace here yet: let them create one (see completeSignup).
+            $code = Str::random(40);
+            Cache::put("zinnvy_signup:{$code}", [
+                'sub' => $sub,
+                'email' => $email,
+                'name' => $claims['name'] ?? ($claims['given_name'] ?? Str::before($email, '@')),
+                'ref' => is_array($stateData) ? ($stateData['ref'] ?? null) : null,
+            ], now()->addMinutes(30));
+
+            return redirect("{$frontend}?signup={$code}");
         }
 
         if (! $user->tenant->is_active) {
@@ -142,5 +157,59 @@ class ZinnvyAuthController extends Controller
             'token' => $payload['token'],
             'success' => true,
         ]);
+    }
+
+    /** Who is signing up (shown on the "name your workspace" step). Does not consume the code. */
+    public function signupInfo(string $code)
+    {
+        $payload = Cache::get("zinnvy_signup:{$code}");
+
+        if (! $payload) {
+            return response()->json(['success' => false, 'message' => 'This sign-up link has expired. Please start again.'], 404);
+        }
+
+        return response()->json(['success' => true, 'name' => $payload['name'], 'email' => $payload['email']]);
+    }
+
+    /** Create the workspace for a verified Zinnvy account, then sign them in. One use per code. */
+    public function completeSignup(Request $request, WorkspaceProvisioner $provisioner)
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string'],
+            'tenant_name' => ['required', 'string', 'max:255'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'currency_symbol' => ['nullable', 'string', 'max:10'],
+        ]);
+
+        $payload = Cache::pull("zinnvy_signup:{$data['code']}");
+
+        if (! $payload) {
+            return response()->json(['success' => false, 'message' => 'This sign-up link has expired. Please start again.'], 404);
+        }
+
+        // Someone else may have linked this email/account in the meantime (e.g. an invite): never create a duplicate.
+        if (User::where('zinnvy_sub', $payload['sub'])->orWhere('email', $payload['email'])->exists()) {
+            return response()->json(['success' => false, 'message' => 'This Zinnvy account already has an Inventory workspace. Sign in instead.'], 409);
+        }
+
+        ['tenant' => $tenant, 'user' => $user] = $provisioner->create([
+            'tenant_name' => trim($data['tenant_name']),
+            'owner_name' => $payload['name'],
+            'email' => $payload['email'],
+            'zinnvy_sub' => $payload['sub'],
+            'currency' => $data['currency'] ?? 'GHS',
+            'currency_symbol' => $data['currency_symbol'] ?? ($data['currency'] ?? 'GHS'),
+            'ref' => $payload['ref'] ?? null,
+        ]);
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+        $tenant->update(['last_active_at' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'user' => $user->load('tenant'),
+            'tenant' => $tenant->fresh(),
+            'token' => $token,
+        ], 201);
     }
 }

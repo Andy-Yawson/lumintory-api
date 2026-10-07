@@ -39,6 +39,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/v1/auth/zinnvy/redirect', [ZinnvyAuthController::class, 'redirect']);
 Route::get('/v1/auth/zinnvy/callback', [ZinnvyAuthController::class, 'callback']);
 Route::post('/v1/auth/zinnvy/handoff', [ZinnvyAuthController::class, 'handoff'])->middleware('throttle:10,1');
+Route::get('/v1/auth/zinnvy/signup/{code}', [ZinnvyAuthController::class, 'signupInfo'])->middleware('throttle:20,1');
+Route::post('/v1/auth/zinnvy/signup', [ZinnvyAuthController::class, 'completeSignup'])->middleware('throttle:10,1');
 
 Route::post('/v1/login', [AuthController::class, 'login'])->middleware('throttle:3,1');
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
