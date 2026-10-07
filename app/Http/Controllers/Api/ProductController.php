@@ -249,6 +249,32 @@ class ProductController extends Controller
         ]);
     }
 
+    /** Dry run of import(): same file + mapping, nothing is written; returns what each row would do. */
+    public function importDryRun(Request $request, ProductImportService $importer)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            'mapping' => 'required|string',
+            'duplicates' => 'nullable|in:skip,update',
+        ]);
+
+        $tenant = Auth::user()->tenant;
+        [, $rows] = $this->readSpreadsheet($request->file('file'));
+
+        $mapping = array_map('intval', array_filter((array) json_decode($request->input('mapping'), true), fn ($v) => $v !== null && $v !== ''));
+        if (! isset($mapping['name'])) {
+            return response()->json(['error' => true, 'message' => 'Choose which column holds the product name.'], 422);
+        }
+
+        return response()->json($importer->plan(
+            $tenant->id,
+            PlanLimit::getLimit($tenant, 'products'),
+            $rows,
+            $mapping,
+            $request->input('duplicates', 'skip'),
+        ) + ['row_limit' => PlanLimit::getLimit($tenant, 'excel_import_rows')]);
+    }
+
     public function import(Request $request, ProductImportService $importer)
     {
         $request->validate([

@@ -65,6 +65,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/add-user', [AuthController::class, 'addUser'])->middleware('limit.users');
     Route::get('/users', [AuthController::class, 'listUsers']);
+    Route::post('/users/{user}/resend-invite', [AuthController::class, 'resendInvite']);
+    Route::delete('/users/{user}', [AuthController::class, 'removeUser']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
     Route::post('activate-subscription', [AuthController::class, 'activateSubscription']);
     Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
@@ -77,6 +79,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::get('products/import/template', [ProductController::class, 'downloadTemplate']);
     Route::post('products/import/preview', [ProductController::class, 'importPreview']);
+    Route::post('products/import/dry-run', [ProductController::class, 'importDryRun']);
     Route::post('products/import', [ProductController::class, 'import']);
     Route::post('products/{id}/add-stock', [ProductController::class, 'addStock']);
 

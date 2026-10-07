@@ -16,7 +16,11 @@ jobs:
 
       - name: Deploy via SSH 🧞‍♂️
         uses: appleboy/ssh-action@master
+        env:
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEMO_OWNER_EMAIL: ${{ secrets.DEMO_OWNER_EMAIL }}
         with:
+          envs: DEMO_PASSWORD,DEMO_OWNER_EMAIL
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -55,6 +59,15 @@ jobs:
 
             echo "Database Seeding..."
             sudo php artisan db:seed --force
+
+            # End-to-end demo data: STAGING (develop) ONLY. StagingSeeder also refuses to
+            # run unless SEED_DEMO_DATA=true, which is only ever set here, inline, on develop.
+            # DEMO_PASSWORD / DEMO_OWNER_EMAIL are optional repo secrets (see database/seeders/README.md).
+            if [ "$GIT_BRANCH" = "develop" ]; then
+              echo "Seeding staging demo data (develop only)..."
+              sudo env SEED_DEMO_DATA=true DEMO_PASSWORD="$DEMO_PASSWORD" DEMO_OWNER_EMAIL="$DEMO_OWNER_EMAIL" \
+                php artisan db:seed --class='Database\Seeders\StagingSeeder' --force
+            fi
 
             echo "Linking storage..."
             sudo php artisan storage:link || true

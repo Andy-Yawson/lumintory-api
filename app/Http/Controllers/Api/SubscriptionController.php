@@ -10,6 +10,11 @@ class SubscriptionController extends Controller
 {
     public function update(Request $request)
     {
+        // No payment step here either: only the platform SuperAdmin may change a plan directly.
+        if (Auth::user()?->role !== 'SuperAdmin') {
+            abort(403, 'Plan changes are handled by the Zinnvy team. Please open a billing ticket.');
+        }
+
         $tenant = Auth::user()->tenant;
         $data = $request->validate([
             'plan' => 'required|in:monthly,yearly,free',

@@ -11,10 +11,21 @@ class AdminAuditLogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AuditLog::latest();
+        $query = AuditLog::with(['user:id,name,email', 'tenant:id,name'])->latest();
 
         if ($request->filled('event')) {
             $query->where('event', 'like', '%' . $request->event . '%');
+        }
+
+        if ($request->filled('method')) {
+            $query->where('method', strtoupper($request->method));
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . $request->search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('event', 'like', $term)->orWhere('route', 'like', $term);
+            });
         }
 
         if ($request->filled('user_id')) {

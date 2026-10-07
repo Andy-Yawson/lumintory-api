@@ -8,6 +8,11 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * Direct plan changes have no payment step behind them, so only the platform SuperAdmin may call
+ * these endpoints (a workspace admin gets a 403 — see TeamInviteTest). The properties below —
+ * only the caller's own tenant is touched, and plan names map onto the DB enum — still hold.
+ */
 class SubscriptionAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
@@ -16,7 +21,7 @@ class SubscriptionAuthorizationTest extends TestCase
     {
         $ownTenant = Tenant::factory()->create(['plan' => 'basic']);
         $otherTenant = Tenant::factory()->create(['plan' => 'basic']);
-        $user = User::factory()->create(['tenant_id' => $ownTenant->id]);
+        $user = User::factory()->create(['tenant_id' => $ownTenant->id, 'role' => 'SuperAdmin']);
 
         // Before the fix, tenant_id came straight from the request body —
         // a user from any tenant could activate/reset a different
@@ -34,7 +39,7 @@ class SubscriptionAuthorizationTest extends TestCase
     public function test_activating_a_yearly_subscription_sets_the_pro_tier_without_a_database_error(): void
     {
         $tenant = Tenant::factory()->create(['plan' => 'basic']);
-        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'SuperAdmin']);
 
         // Before the fix, this always 500'd — tenants.plan is a DB
         // enum('basic','pro','custom') and the endpoint tried to write the
@@ -50,7 +55,7 @@ class SubscriptionAuthorizationTest extends TestCase
     public function test_setting_the_subscription_to_free_maps_to_the_basic_tier_without_a_database_error(): void
     {
         $tenant = Tenant::factory()->create(['plan' => 'pro']);
-        $user = User::factory()->create(['tenant_id' => $tenant->id]);
+        $user = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'SuperAdmin']);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/subscription', ['plan' => 'free'])

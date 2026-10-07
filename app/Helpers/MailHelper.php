@@ -58,7 +58,7 @@ class MailHelper
         }
 
         $lines[] = "";
-        $lines[] = "You can view more details in your dashboard: " . env('FRONTEND_URL') . '/dashboard/products';
+        $lines[] = "You can view more details in your dashboard: " . rtrim((string) config('services.frontend_url'), '/') . '/dashboard/products/';
         $lines[] = "";
         $lines[] = "You received this because stock forecasting is enabled for your tenant.";
         $lines[] = "";

@@ -103,6 +103,7 @@ class ProductImportService
     {
         $result = ['created' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0, 'errors' => []];
         $count = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->count();
+        $seenSkus = [];
 
         foreach ($rows as $i => $row) {
             $rowNo = $firstRowNumber + $i;
@@ -126,6 +127,14 @@ class ProductImportService
             }
 
             $sku = trim((string) $get('sku')) ?: null;
+
+            // Same SKU twice in one file: the first row wins (matches the dry-run's review).
+            if ($sku && isset($seenSkus[$sku])) {
+                $result['skipped']++;
+                $result['errors'][] = ['row' => $rowNo, 'message' => "Same SKU as row {$seenSkus[$sku]} in this file"];
+                continue;
+            }
+
             $existing = $sku
                 ? Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('sku', $sku)->first()
                 : null;
@@ -139,6 +148,10 @@ class ProductImportService
                 $result['skipped']++;
                 $result['errors'][] = ['row' => $rowNo, 'message' => "Product limit ({$limit}) reached on your plan"];
                 continue;
+            }
+
+            if ($sku) {
+                $seenSkus[$sku] = $rowNo;
             }
 
             DB::beginTransaction();
@@ -190,6 +203,85 @@ class ProductImportService
         }
 
         return $result;
+    }
+
+    /**
+     * Dry run: applies exactly the rules import() applies, but writes nothing,
+     * and reports what each row WOULD do against the current catalogue — so the
+     * user can review the outcome before anything is saved.
+     *
+     * @return array{summary: array{create:int, update:int, skip:int, error:int}, total:int, rows: array<int, array<string, mixed>>}
+     */
+    public function plan(int $tenantId, ?int $limit, array $rows, array $mapping, string $duplicates = 'skip', int $firstRowNumber = 2, int $maxRows = 100): array
+    {
+        $summary = ['create' => 0, 'update' => 0, 'skip' => 0, 'error' => 0];
+        $out = [];
+        $total = 0;
+
+        $col = fn (array $row, string $f) => isset($mapping[$f]) ? ($row[$mapping[$f]] ?? null) : null;
+
+        // One lookup for every SKU in the file, not one query per row.
+        $skus = collect($rows)->map(fn ($r) => trim((string) $col($r, 'sku')))->filter()->unique()->values();
+        $existingBySku = $skus->isEmpty() ? collect() : Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)->whereIn('sku', $skus)->pluck('id', 'sku');
+        $knownCategories = Category::withoutGlobalScopes()->where('tenant_id', $tenantId)->pluck('name')->map(fn ($n) => mb_strtolower($n))->flip();
+        $count = Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->count();
+        $seenSkus = [];
+
+        foreach ($rows as $i => $row) {
+            if (! collect($row)->contains(fn ($v) => $v !== null && trim((string) $v) !== '')) {
+                continue;
+            }
+            $total++;
+
+            $name = trim((string) $col($row, 'name'));
+            $sku = trim((string) $col($row, 'sku')) ?: null;
+            $qty = self::number($col($row, 'quantity'));
+            $price = self::number($col($row, 'unit_price'));
+            $category = trim((string) $col($row, 'category'));
+
+            $action = 'create';
+            $reason = null;
+
+            if ($name === '') {
+                [$action, $reason] = ['error', 'Product name is empty'];
+            } elseif (($qty ?? 0) < 0 || ($price ?? 0) < 0) {
+                [$action, $reason] = ['error', 'Quantity and price cannot be negative'];
+            } elseif ($sku && isset($seenSkus[$sku])) {
+                [$action, $reason] = ['skip', "Same SKU as row {$seenSkus[$sku]} in this file"];
+            } elseif ($sku && $existingBySku->has($sku)) {
+                $action = $duplicates === 'update' ? 'update' : 'skip';
+                $reason = $duplicates === 'update' ? 'SKU already exists — will be updated' : 'SKU already exists — kept as is';
+            } elseif ($limit !== null && $count >= $limit) {
+                [$action, $reason] = ['skip', "Product limit ({$limit}) reached on your plan"];
+            }
+
+            if ($action === 'create') {
+                $count++;
+            }
+            if ($sku && in_array($action, ['create', 'update'], true)) {
+                $seenSkus[$sku] = $firstRowNumber + $i;
+            }
+            $summary[$action]++;
+
+            if (count($out) < $maxRows) {
+                $out[] = [
+                    'row' => $firstRowNumber + $i,
+                    'action' => $action,
+                    'reason' => $reason,
+                    'name' => $name ?: null,
+                    'sku' => $sku,
+                    'category' => $category ?: null,
+                    'new_category' => $category !== '' && ! $knownCategories->has(mb_strtolower($category)),
+                    'quantity' => $qty,
+                    'unit_price' => $price,
+                    'size' => trim((string) $col($row, 'size')) ?: null,
+                    'has_variations' => trim((string) $col($row, 'variations')) !== '',
+                ];
+            }
+        }
+
+        return ['summary' => $summary, 'total' => $total, 'rows' => $out];
     }
 
     private function fail(array &$result, int $row, string $message): void

@@ -33,7 +33,7 @@ class AdminUserController extends Controller
     public function update(Request $request, User $user)
     {
         $data = $request->validate([
-            'role' => ['required', Rule::in(['User', 'Admin', 'SuperAdmin'])],
+            'role' => ['required', Rule::in(['Administrator', 'Sales', 'Support', 'SuperAdmin'])],
         ]);
 
         $user->update($data);

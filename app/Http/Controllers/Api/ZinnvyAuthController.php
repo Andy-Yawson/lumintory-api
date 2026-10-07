@@ -91,6 +91,11 @@ class ZinnvyAuthController extends Controller
             }
         }
 
+        if (! $user && ! $emailVerified && User::where('email', $email)->exists()) {
+            // Invited here, but their Zinnvy email isn't verified yet — say so instead of "no account".
+            return redirect("{$frontend}?error=email_unverified&email=".urlencode($email));
+        }
+
         if (! $user) {
             return redirect("{$frontend}?error=no_account&email=".urlencode($email));
         }
@@ -98,6 +103,9 @@ class ZinnvyAuthController extends Controller
         if (! $user->tenant->is_active) {
             return redirect("{$frontend}?error=subscription_inactive");
         }
+
+        // First successful sign-in clears the "Invited" state shown on the Team page.
+        $user->forceFill(['first_login' => false])->save();
 
         $user->tokens()->delete();
         $apiToken = $user->createToken('auth_token')->plainTextToken;

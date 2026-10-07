@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -192,6 +193,13 @@ class AuthController extends Controller
         // that it belonged to the caller — any authenticated user of any
         // tenant could activate (or silently extend/reset) a completely
         // different tenant's subscription just by guessing an id.
+        // There is no payment step behind this endpoint, so letting a workspace call it
+        // would hand out a paid plan for free. Plan changes go through support / the
+        // admin console (AdminPlanController::assignToTenant) until payments exist.
+        if (Auth::user()?->role !== 'SuperAdmin') {
+            abort(403, 'Plan changes are handled by the Zinnvy team. Please open a billing ticket.');
+        }
+
         $validated = $request->validate([
             'plan' => 'required|in:monthly,yearly',
         ]);
@@ -216,30 +224,105 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Invite a teammate. They sign in with "Continue with Zinnvy" using this email
+     * (the OAuth callback links the Zinnvy account to this user by verified email),
+     * so no password is collected here. A random unusable password is set so the row
+     * is valid; `first_login` stays true until their first sign-in, which marks them "Invited".
+     * Passing a password is still accepted for API clients that want password sign-in.
+     */
     public function addUser(Request $request)
     {
+        $this->requireTenantAdmin();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6',
+            'password' => 'nullable|string|min:6',
             'role' => 'required|in:Administrator,Sales',
         ]);
 
-        $tenantId = Auth::user()->tenant_id;
+        $inviter = Auth::user();
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'tenant_id' => $tenantId,
+            'password' => Hash::make($validated['password'] ?? Str::random(40)),
+            'tenant_id' => $inviter->tenant_id,
             'role' => $validated['role'],
             'first_login' => true,
         ]);
 
+        $this->sendInvite($user, $inviter);
+
         return response()->json([
-            'message' => 'User added successfully.',
+            'message' => 'Invitation sent. They can sign in with Zinnvy using ' . $user->email . '.',
             'user' => $user,
         ], 201);
+    }
+
+    public function resendInvite(User $user)
+    {
+        $this->requireTenantAdmin();
+        $this->ensureSameTenant($user);
+
+        if (! $user->first_login) {
+            return response()->json(['message' => 'This person has already signed in.'], 422);
+        }
+
+        $this->sendInvite($user, Auth::user());
+
+        return response()->json(['message' => 'Invitation sent again.']);
+    }
+
+    /** Revoke a teammate's access. Never yourself, and never the last Administrator. */
+    public function removeUser(User $user)
+    {
+        $this->requireTenantAdmin();
+        $this->ensureSameTenant($user);
+
+        if ($user->id === Auth::id()) {
+            return response()->json(['message' => 'You cannot remove yourself.'], 422);
+        }
+
+        if ($user->role === 'Administrator'
+            && User::where('tenant_id', $user->tenant_id)->where('role', 'Administrator')->count() <= 1) {
+            return response()->json(['message' => 'A workspace needs at least one Administrator.'], 422);
+        }
+
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json(['message' => 'Access removed.']);
+    }
+
+    private function requireTenantAdmin(): void
+    {
+        if (Auth::user()?->role !== 'Administrator') {
+            abort(403, 'Only a workspace Administrator can manage the team.');
+        }
+    }
+
+    private function ensureSameTenant(User $user): void
+    {
+        if ($user->tenant_id !== Auth::user()->tenant_id || $user->role === 'SuperAdmin') {
+            abort(404);
+        }
+    }
+
+    private function sendInvite(User $user, User $inviter): void
+    {
+        $workspace = $inviter->tenant?->name ?? 'a workspace';
+        $loginUrl = rtrim((string) config('services.frontend_url'), '/') . '/login';
+
+        MailHelper::sendEmailNotification(
+            $user->email,
+            "{$inviter->name} invited you to {$workspace} on Zinnvy Inventory",
+            "Hi {$user->name},\n\n{$inviter->name} added you to {$workspace} as " . ($user->role === 'Administrator' ? 'an Administrator' : 'a Sales user') . ".\n\n"
+            . "To get in, open {$loginUrl} and choose \"Continue with Zinnvy\", signing in with this email address ({$user->email}).\n"
+            . "Don't have a Zinnvy account yet? Create one free at https://accounts.zinnvy.com using this same email, verify it, then come back and sign in.\n\n"
+            . "Regards,\nZinnvy."
+        );
     }
 
     public function listUsers()
