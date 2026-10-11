@@ -19,3 +19,9 @@ yarn-error.log
 /.vscode
 /.claude
 .claude
+
+# AI assistant files: never commit
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
