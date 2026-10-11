@@ -50,6 +50,8 @@ class AiConnectController extends Controller
             'base_url' => rtrim(config('app.url'), '/') . '/api/v1/integrations/ai',
             'tenant_ref' => (string) $tenant->id,
             'tenant_name' => $tenant->name,
+            // Lets Zinnvy AI check the signed page context Inventory issues. Derived, never the raw secret.
+            'signing_secret' => \App\Services\CopilotContextToken::signingSecret($key),
         ]);
     }
 }
