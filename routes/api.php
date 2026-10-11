@@ -24,6 +24,8 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SmsController;
+use App\Http\Controllers\Api\PaySubscriptionController;
+use App\Http\Controllers\Api\PayWebhookController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\StoreConnectionController;
@@ -55,6 +57,7 @@ Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail'])->mi
 // --- Online stores: provider callbacks + webhooks (public; verified by signature / one-time state) ---
 Route::get('/v1/stores/shopify/callback', [StoreConnectionController::class, 'shopifyCallback']);
 Route::post('/v1/stores/woocommerce/callback', [StoreConnectionController::class, 'wooCallback'])->middleware('throttle:30,1');
+Route::post('/v1/webhooks/pay', PayWebhookController::class);   // Zinnvy Pay; verified by signature
 Route::post('/v1/webhooks/shopify', [StoreWebhookController::class, 'shopify']);
 Route::post('/v1/webhooks/woocommerce/{uuid}', [StoreWebhookController::class, 'woocommerce']);
 
@@ -110,6 +113,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/reports/usage', [ReportController::class, 'index']);
 
     Route::post('/subscription', [SubscriptionController::class, 'update']);
+    Route::post('/subscription/checkout', [PaySubscriptionController::class, 'checkout'])->middleware('throttle:10,1');
+    Route::post('/subscription/confirm', [PaySubscriptionController::class, 'confirm'])->middleware('throttle:30,1');
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt']);
 
     Route::post('/rewards/daily-login', [TokenController::class, 'dailyLogin']);

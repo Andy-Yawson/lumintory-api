@@ -17,6 +17,6 @@ class PlanController extends Controller
             ->orderBy('sort_order')
             ->get(['id', 'name', 'label', 'price_monthly', 'price_yearly', 'currency', 'limits']);
 
-        return response()->json(['plans' => $plans]);
+        return response()->json(['plans' => $plans, 'payments_enabled' => \App\Services\Pay\PayClient::configured()]);
     }
 }

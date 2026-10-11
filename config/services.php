@@ -31,6 +31,13 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Zinnvy Pay: Inventory subscriptions are paid through it (never a provider directly).
+    'pay' => [
+        'url' => env('PAY_API_URL'),
+        'secret_key' => env('PAY_SECRET_KEY'),
+        'webhook_secret' => env('PAY_WEBHOOK_SECRET'),
+    ],
+
     // Public URL of the Inventory web app; OAuth callbacks send people back here.
     'frontend_url' => env('FRONTEND_URL'),
 
