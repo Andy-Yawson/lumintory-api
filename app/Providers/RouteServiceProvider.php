@@ -24,8 +24,13 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A single-page app makes several requests per screen, so signed-in users get room for a busy
+        // till (60/min tripped after ~12 page changes). Anonymous traffic stays tight; sign-in, SMS and
+        // webhooks keep their own stricter throttles on top of this.
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            return $request->user()
+                ? Limit::perMinute(300)->by('user:'.$request->user()->id)
+                : Limit::perMinute(60)->by('ip:'.$request->ip());
         });
 
         $this->routes(function () {
