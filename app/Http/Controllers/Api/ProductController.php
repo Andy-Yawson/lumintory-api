@@ -56,7 +56,8 @@ class ProductController extends Controller
             'min_stock_threshold' => 'nullable|integer',
             'category_id' => 'nullable|exists:categories,id',
 
-            'variations' => 'nullable|array|min:1',
+            // An empty list means "no variations" (a simple product).
+            'variations' => 'nullable|array',
             'variations.*.name' => 'required|string',
             'variations.*.quantity' => 'required|numeric|min:0',
             'variations.*.unit_price' => 'nullable|numeric',
@@ -136,20 +137,24 @@ class ProductController extends Controller
             'variations.*.sku' => 'nullable|string',
         ]);
 
-        if (isset($data['quantity'], $data['variations'])) {
-            return response()->json([
-                'message' => 'Cannot update quantity and variations simultaneously.'
-            ], 422);
-        }
-
         return DB::transaction(function () use ($product, $data) {
 
-            $hasVariations = array_key_exists('variations', $data);
+            // variations absent      -> plain field update (quantity as sent)
+            // variations: []         -> product becomes simple: variations removed, quantity as sent
+            // variations: [...]      -> stock is the sum of the variations; a sent quantity is ignored
+            $variationsSent = array_key_exists('variations', $data) && is_array($data['variations']);
+            $hasVariations = $variationsSent && count($data['variations']) > 0;
 
-            // 1. Update product fields
-            $product->update(collect($data)->except('variations')->toArray());
+            $fields = collect($data)->except('variations');
+            if ($hasVariations) {
+                $fields = $fields->except('quantity');
+            }
+            $product->update($fields->toArray());
 
-            // 2. If variations are present in request
+            if ($variationsSent && ! $hasVariations) {
+                $product->variations()->delete();
+            }
+
             if ($hasVariations) {
 
                 $incomingIds = collect($data['variations'])
@@ -168,7 +173,8 @@ class ProductController extends Controller
 
                     // FIX: Find the MODEL instance so that $casts are respected
                     if (!empty($variationData['id'])) {
-                        $variation = ProductVariation::find($variationData['id']);
+                        // Only this product's own variations can be edited through it.
+                        $variation = $product->variations()->whereKey($variationData['id'])->first();
                         if ($variation) {
                             $variation->fill([
                                 'name' => $variationData['name'],

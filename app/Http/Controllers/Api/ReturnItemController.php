@@ -71,7 +71,7 @@ class ReturnItemController extends Controller
             'returns' => 'required|array|min:1',
             'returns.*.sale_id' => 'required|exists:sales,id',
             'returns.*.quantity' => 'required|numeric|min:0.01',
-            'returns.*.refund_amount' => 'nullable|numeric',
+            'returns.*.refund_amount' => 'nullable|numeric|min:0',
             'returns.*.reason' => 'required|string',
             'returns.*.return_date' => 'required|date',
             'returns.*.refund_method' => 'required|string',

@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use DB;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 
 class SaleController extends Controller
@@ -65,18 +66,32 @@ class SaleController extends Controller
     public function store(Request $request)
     {
         // Validate the structure including the new 'items' array
+        $tenantId = Auth::user()->tenant_id;
+        $inTenant = fn (string $table) => Rule::exists($table, 'id')->where('tenant_id', $tenantId);
+
+        // Validate the structure including the 'items' array; every id must belong to this workspace.
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.variation_id' => 'nullable|exists:product_variations,id',
-            'items.*.quantity' => 'required',
-            'items.*.unit_price' => 'required',
-            'customer_id' => 'nullable|exists:customers,id',
+            'items.*.product_id' => ['required', $inTenant('products')],
+            'items.*.variation_id' => ['nullable', $inTenant('product_variations')],
+            'items.*.quantity' => 'required|numeric|gt:0',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'customer_id' => ['nullable', $inTenant('customers')],
             'overall_discount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'sale_date' => 'nullable|date',
             'payment_method' => 'required|string',
         ]);
+
+        foreach ($request->items as $i => $item) {
+            if (! empty($item['variation_id'])
+                && ! ProductVariation::whereKey($item['variation_id'])->where('product_id', $item['product_id'])->exists()) {
+                return response()->json([
+                    'message' => 'That variation does not belong to the selected product.',
+                    'errors' => ["items.{$i}.variation_id" => ['That variation does not belong to the selected product.']],
+                ], 422);
+            }
+        }
 
         try {
             return DB::transaction(function () use ($request) {
@@ -99,7 +114,8 @@ class SaleController extends Controller
                         $itemDiscount = round(($itemGross / $totalGross) * $overallDiscount, 2);
                     }
 
-                    $sales[] = Sale::create([
+                    try {
+                        $sale = Sale::create([
                         'tenant_id' => $tenantId,
                         'product_id' => $item['product_id'],
                         'variation_id' => $item['variation_id'] ?? null,
@@ -111,7 +127,15 @@ class SaleController extends Controller
                         'notes' => $request->notes,
                         'sale_date' => $saleDate,
                         'payment_method' => $request->payment_method,
-                    ]);
+                        ]);
+                    } catch (\Exception $e) {
+                        if (! str_starts_with($e->getMessage(), 'Insufficient')) {
+                            throw $e;
+                        }
+                        $name = Product::find($item['product_id'])?->name ?? 'one of the items';
+                        throw new \RuntimeException("Insufficient stock: not enough {$name} in stock for this sale.");
+                    }
+                    $sales[] = $sale;
                 }
 
                 return response()->json([
@@ -121,7 +145,13 @@ class SaleController extends Controller
                 ], 201);
             });
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to record sales: ' . $e->getMessage()], 500);
+            // Running out of stock is a problem with the request, not the server.
+            if (str_starts_with($e->getMessage(), 'Insufficient')) {
+                return response()->json(['message' => ucfirst(trim(substr($e->getMessage(), strlen('Insufficient stock:'))))], 422);
+            }
+            report($e);
+
+            return response()->json(['message' => 'Could not record the sale. Please try again.'], 500);
         }
     }
 
@@ -223,7 +253,7 @@ class SaleController extends Controller
     public function receipt(Sale $sale)
     {
         $this->authorizeTenant($sale);
-        $sale->load('product', 'customer', 'tenant');
+        $sale->load('product', 'customer', 'tenant', 'variation');
 
         $pdf = Pdf::loadView('receipts.sale', compact('sale'))
             ->setPaper('a5', 'portrait');

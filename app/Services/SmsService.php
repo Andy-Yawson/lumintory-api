@@ -77,10 +77,10 @@ class SmsService
         }
     }
 
+    /** Same rule everywhere: one SMS up to 160 characters, then 153 per part. */
     public function calculateSegments($message)
     {
-        $len = mb_strlen($message);
-        return (int) ceil($len / 160);
+        return self::segments((string) $message);
     }
 
     public function getProviderBalance()

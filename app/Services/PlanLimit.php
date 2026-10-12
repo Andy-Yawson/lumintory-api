@@ -18,7 +18,9 @@ class PlanLimit
 
         // Cache per plan name (busted when admin saves a plan)
         return Cache::remember("plan_limits:{$planName}", 300, function () use ($planName) {
-            $plan = SubscriptionPlan::where('name', $planName)->where('is_active', true)->first();
+            // Not filtered by is_active: deactivating a plan stops selling it, but tenants who
+            // already have it keep its limits (otherwise they'd silently become unlimited).
+            $plan = SubscriptionPlan::where('name', $planName)->first();
 
             if ($plan && !empty($plan->limits)) {
                 return $plan->limits;

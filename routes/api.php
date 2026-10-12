@@ -65,8 +65,10 @@ Route::post('/v1/webhooks/woocommerce/{uuid}', [StoreWebhookController::class, '
 Route::get('/v1/plans', [PlanController::class, 'index']);
 
 
-Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+// Signing out always works, even for a deactivated workspace.
+Route::middleware(['auth:sanctum'])->post('/v1/logout', [AuthController::class, 'logout']);
+
+Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/add-user', [AuthController::class, 'addUser'])->middleware('limit.users');
     Route::get('/users', [AuthController::class, 'listUsers']);
@@ -130,8 +132,10 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
 
-    Route::get('/audit/logs', [AuditLogController::class, 'index']);
-    Route::get('/audit/stats', [AuditLogController::class, 'stats']);
+    Route::middleware('workspace.admin')->group(function () {
+        Route::get('/audit/logs', [AuditLogController::class, 'index']);
+        Route::get('/audit/stats', [AuditLogController::class, 'stats']);
+    });
 
     // ------- Suppot Ticket -------
     Route::get('/support-tickets/analytics', [SupportTicketController::class, 'analytics']);
@@ -143,9 +147,10 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
 
     // ----- Zinnvy AI "Connect with Zinnvy" provisioning (P4-C) -----
-    Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision']);
+    Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision'])->middleware('workspace.admin');
 
     //----- Online stores (Shopify / WooCommerce) ------
+    Route::middleware('workspace.admin')->group(function () {
     Route::get('/stores', [StoreConnectionController::class, 'index']);
     Route::middleware('feature:shopify_woo')->group(function () {
         Route::post('/stores/shopify/connect', [StoreConnectionController::class, 'shopifyConnect']);
@@ -160,6 +165,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('/integration-keys', [IntegrationApiKeyController::class, 'store']);
     Route::put('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'update']);
     Route::delete('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'destroy']);
+    }); // workspace.admin: stores + integration keys
 
 });
 
