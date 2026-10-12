@@ -25,7 +25,7 @@
         table.items { width: 100%; border-collapse: collapse; margin-top: 8px; }
         table.items th { text-align: left; font-size: 10px; text-transform: uppercase; color: #738078; border-bottom: 1px solid #cfd6cb; padding: 6px 4px; }
         table.items td { padding: 8px 4px; border-bottom: 1px solid #e0e4dd; vertical-align: top; }
-        .num { text-align: right; white-space: nowrap; }
+        table.items .num, table.totals .num { text-align: right; white-space: nowrap; }
         table.totals { width: 55%; margin-left: 45%; border-collapse: collapse; margin-top: 10px; }
         table.totals td { padding: 3px 4px; }
         table.totals tr.grand td { font-size: 14px; font-weight: bold; border-top: 1px solid #24312b; padding-top: 6px; }
