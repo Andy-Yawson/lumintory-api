@@ -22,6 +22,7 @@ class SmsService
 
     public function queueSms($tenantId, $from, $to, $message)
     {
+        $message = self::toGsm((string) $message);
         $segments = $this->calculateSegments($message);
 
         $log = SmsLog::create([
@@ -109,6 +110,47 @@ class SmsService
         }
 
         return $number;
+    }
+
+    /** GSM 03.38: what a standard SMS can carry. Anything else arrives as "?" on the phone. */
+    private const GSM_BASIC = "@£\$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+    private const GSM_EXTENDED = '^{}\\[~]|€';
+
+    /**
+     * Make a message safe for a standard (GSM-7) SMS instead of letting the network turn
+     * characters into "?": curly quotes become straight ones, dashes become "-", currency
+     * symbols become codes (GH₵ 42 → GHS 42), accents are dropped (Akwaaba é → e).
+     * Sending as Unicode SMS would keep them, but cuts each SMS from 160 to 70 characters.
+     */
+    public static function toGsm(string $text): string
+    {
+        $text = strtr($text, [
+            'GH₵' => 'GHS', 'GH¢' => 'GHS', '₵' => 'GHS ', '¢' => 'GHS ', '₦' => 'NGN ', 'KSh' => 'KES',
+            '’' => "'", '‘' => "'", '‚' => "'", '′' => "'", '`' => "'", '´' => "'",
+            '“' => '"', '”' => '"', '„' => '"', '″' => '"', '«' => '"', '»' => '"',
+            '–' => '-', '—' => '-', '‐' => '-', '‑' => '-', '−' => '-', '•' => '-', '·' => '-',
+            '…' => '...', '×' => 'x', '÷' => '/', '™' => '', '®' => '', '©' => '(c)',
+            "\u{00A0}" => ' ', "\u{2009}" => ' ', "\u{202F}" => ' ', "\t" => ' ',
+        ]);
+
+        $out = '';
+        foreach (mb_str_split($text) as $ch) {
+            if (mb_strpos(self::GSM_BASIC, $ch) !== false || mb_strpos(self::GSM_EXTENDED, $ch) !== false) {
+                $out .= $ch;
+                continue;
+            }
+            // Accented and other letters: closest plain version (ô → o, ɛ → e); drop what has none (emoji).
+            // Split off accents (ô → o + ̂) and drop them; this behaves the same on every OS, unlike iconv.
+            $plain = class_exists(\Normalizer::class) ? preg_replace('/\p{Mn}+/u', '', (string) \Normalizer::normalize($ch, \Normalizer::FORM_D)) : $ch;
+            if (preg_match('/[^\x20-\x7E]/', $plain) && function_exists('iconv')) {
+                $plain = (string) @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $plain);
+                $plain = preg_replace('/[\^`~"]/', '', $plain); // macOS iconv writes ô as ^o
+            }
+            $plain = preg_replace('/[^\x20-\x7E]/', '', (string) $plain);
+            $out .= $plain === '?' ? '' : $plain;
+        }
+
+        return preg_replace('/ {2,}/', ' ', $out);
     }
 
     public static function segments(string $message): int

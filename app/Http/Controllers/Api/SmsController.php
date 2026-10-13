@@ -74,6 +74,8 @@ class SmsController extends Controller
             return response()->json(['success' => false, 'message' => 'No valid phone numbers to send to.'], 422);
         }
 
+        // Charge for what is actually sent: the GSM-safe text (₵ → GHS etc.), not the raw input.
+        $message = SmsService::toGsm($message);
         $segments = SmsService::segments($message);
         $needed = $segments * $recipients->count();
 
