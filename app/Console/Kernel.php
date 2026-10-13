@@ -15,6 +15,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('inventory:forecast --window=30')->everyThreeHours();
         $schedule->command('app:credit-remainder')->hourly();
         $schedule->command('stores:sync')->hourly();
+        // Expired sign-in tokens: access tokens (Sanctum) and refresh tokens.
+        $schedule->command('sanctum:prune-expired --hours=24')->daily();
+        $schedule->call(fn () => \App\Services\AuthSessions::prune())->daily()->name('prune-refresh-tokens');
     }
 
 
