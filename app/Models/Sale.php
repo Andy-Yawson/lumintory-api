@@ -24,13 +24,15 @@ class Sale extends Model
         'customer_id',
         'payment_method',
         'variation_id',
-        'discount'
+        'discount',
+        'stock_deducted',
     ];
 
     protected $casts = [
         'sale_date' => 'date',
         'variation_id' => 'integer',
         'quantity' => 'decimal:2',
+        'stock_deducted' => 'boolean',
     ];
 
     // === TENANT SCOPING ===
@@ -43,7 +45,11 @@ class Sale extends Model
         static::creating(function ($sale) {
 
             $sale->total_amount = ($sale->quantity * $sale->unit_price) - ($sale->discount ?? 0);
-            // $sale->total_amount = $sale->quantity * $sale->unit_price;
+
+            // Imported history: record the sale, leave stock alone.
+            if ($sale->stock_deducted === false) {
+                return;
+            }
 
             $product = Product::lockForUpdate()->find($sale->product_id);
 
@@ -80,6 +86,9 @@ class Sale extends Model
 
         // Restore stock on delete
         static::deleting(function ($sale) {
+            if ($sale->stock_deducted === false) {
+                return; // never took stock, so there's none to give back
+            }
             $product = Product::find($sale->product_id);
 
             if ($sale->variation_id) {

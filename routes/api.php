@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\StoreConnectionController;
 use App\Http\Controllers\Api\StoreWebhookController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\OnboardingController;
+use App\Http\Controllers\Api\SaleImportController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\ZinnvyAiController;
 use App\Http\Controllers\Api\ZinnvyAuthController;
@@ -98,6 +99,10 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
 
     Route::apiResource('categories', CategoryController::class);
 
+    Route::get('sales/import/template', [SaleImportController::class, 'template']);
+    Route::post('sales/import/preview', [SaleImportController::class, 'preview']);
+    Route::post('sales/import/dry-run', [SaleImportController::class, 'dryRun']);
+    Route::post('sales/import', [SaleImportController::class, 'import']);
     Route::post('sales', [SaleController::class, 'store'])->middleware('limit.sales');
     Route::apiResource('sales', SaleController::class);
 
