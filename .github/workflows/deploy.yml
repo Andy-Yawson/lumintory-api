@@ -17,10 +17,13 @@ jobs:
       - name: Deploy via SSH 🧞‍♂️
         uses: appleboy/ssh-action@master
         env:
+          # The remote script only sees variables listed in `envs`; GitHub's own GITHUB_REF is not
+          # passed through, so the branch must be handed over explicitly (it used to fall back to staging).
+          TARGET_BRANCH: ${{ github.ref_name }}
           DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
           DEMO_OWNER_EMAIL: ${{ secrets.DEMO_OWNER_EMAIL }}
         with:
-          envs: DEMO_PASSWORD,DEMO_OWNER_EMAIL
+          envs: TARGET_BRANCH,DEMO_PASSWORD,DEMO_OWNER_EMAIL
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -28,13 +31,11 @@ jobs:
             set -e
 
             echo "Determining target directory and branch..."
-            if [ "${GITHUB_REF##*/}" = "master" ]; then
-              APP_DIR="/var/www/zinnvy-api"
-              GIT_BRANCH="master"
-            else
-              APP_DIR="/var/www/zinnvy-api-test"
-              GIT_BRANCH="develop"
-            fi
+            case "$TARGET_BRANCH" in
+              master)  APP_DIR="/var/www/zinnvy-api";      GIT_BRANCH="master" ;;
+              develop) APP_DIR="/var/www/zinnvy-api-test"; GIT_BRANCH="develop" ;;
+              *) echo "Refusing to deploy unknown branch '$TARGET_BRANCH'"; exit 1 ;;
+            esac
 
             echo "Using app directory: $APP_DIR"
             echo "Using git branch: $GIT_BRANCH"
