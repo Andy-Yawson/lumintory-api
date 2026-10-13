@@ -37,11 +37,8 @@ class AuthController extends Controller
             return response()->json(['message' => 'Subscription inactive. Please renew.'], 403);
         }
 
-        // Delete old tokens if needed
-        $user->tokens()->delete();
-
-        // Create new token
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $session = \App\Services\AuthSessions::issue($user, userAgent: $request->userAgent());
+        $token = $session['token'];
 
         if ($user->tenant) {
             $user->tenant->update(['last_active_at' => now()]);
@@ -50,14 +47,43 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user->load('tenant'),
             'token' => $token,
+            'refresh_token' => $session['refresh_token'],
+            'expires_in' => $session['expires_in'],
             'success' => true
         ]);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $current = $request->user()->currentAccessToken();
+        \App\Services\AuthSessions::revokeForAccessToken($current?->id); // this device's refresh tokens too
+        $current?->delete();
+
         return response()->json(['message' => 'Logged out']);
+    }
+
+    /**
+     * Swap a refresh token for a new access + refresh pair (no access token needed: it may have
+     * expired). The app calls this when a request comes back 401, then retries the request.
+     */
+    public function refresh(Request $request)
+    {
+        $data = $request->validate(['refresh_token' => 'required|string|max:200']);
+        $result = \App\Services\AuthSessions::refresh($data['refresh_token'], $request->userAgent());
+
+        if ($result === 'inactive') {
+            return response()->json(['message' => 'This workspace is not active.', 'code' => 'workspace_inactive'], 403);
+        }
+        if (is_string($result)) {
+            return response()->json(['message' => 'Your session has ended. Please sign in again.', 'code' => "refresh_{$result}"], 401);
+        }
+
+        return response()->json([
+            'token' => $result['token'],
+            'refresh_token' => $result['refresh_token'],
+            'expires_in' => $result['expires_in'],
+            'user' => $result['user'],
+        ]);
     }
 
     public function me(Request $request)
@@ -183,7 +209,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'A workspace needs at least one Administrator.'], 422);
         }
 
-        $user->tokens()->delete();
+        \App\Services\AuthSessions::revokeAllFor($user);
         $user->delete();
 
         return response()->json(['message' => 'Access removed.']);

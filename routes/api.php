@@ -51,6 +51,8 @@ Route::get('/v1/auth/zinnvy/signup/{code}', [ZinnvyAuthController::class, 'signu
 Route::post('/v1/auth/zinnvy/signup', [ZinnvyAuthController::class, 'completeSignup'])->middleware('throttle:10,1');
 
 Route::post('/v1/login', [AuthController::class, 'login'])->middleware('throttle:3,1');
+// Silent session refresh (rotating refresh token). Generous limit: every open tab may refresh.
+Route::post('/v1/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:30,1');
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
 
 Route::post('/v1/password/forgot', [PasswordResetController::class, 'requestReset']);

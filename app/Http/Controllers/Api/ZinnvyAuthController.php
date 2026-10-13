@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuthSessions;
 use App\Services\WorkspaceProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -122,14 +123,16 @@ class ZinnvyAuthController extends Controller
         // First successful sign-in clears the "Invited" state shown on the Team page.
         $user->forceFill(['first_login' => false])->save();
 
-        $user->tokens()->delete();
-        $apiToken = $user->createToken('auth_token')->plainTextToken;
+        // A new session for this device only: signing in here no longer signs you out elsewhere.
+        $session = AuthSessions::issue($user, userAgent: $request->userAgent());
         $user->tenant->update(['last_active_at' => now()]);
 
         $handoff = Str::random(40);
         Cache::put("zinnvy_handoff:{$handoff}", [
             'user_id' => $user->id,
-            'token' => $apiToken,
+            'token' => $session['token'],
+            'refresh_token' => $session['refresh_token'],
+            'expires_in' => $session['expires_in'],
         ], now()->addSeconds(60));
 
         return redirect("{$frontend}?handoff={$handoff}");
@@ -155,6 +158,8 @@ class ZinnvyAuthController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $payload['token'],
+            'refresh_token' => $payload['refresh_token'] ?? null,
+            'expires_in' => $payload['expires_in'] ?? null,
             'success' => true,
         ]);
     }
@@ -202,14 +207,13 @@ class ZinnvyAuthController extends Controller
             'ref' => $payload['ref'] ?? null,
         ]);
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $session = AuthSessions::issue($user, userAgent: $request->userAgent());
         $tenant->update(['last_active_at' => now()]);
 
         return response()->json([
             'success' => true,
             'user' => $user->load('tenant'),
             'tenant' => $tenant->fresh(),
-            'token' => $token,
-        ], 201);
+        ] + $session, 201);
     }
 }
