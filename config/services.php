@@ -41,6 +41,13 @@ return [
     // Public URL of the Inventory web app; OAuth callbacks send people back here.
     'frontend_url' => env('FRONTEND_URL'),
 
+    // SMS provider (read through config so it keeps working when config is cached).
+    'sms' => [
+        'base_url' => env('SMS_BASE_URL'),
+        'app_id' => env('SMS_APP_ID'),
+        'app_secret' => env('SMS_APP_SECRET'),
+    ],
+
     'shopify' => [
         'client_id' => env('SHOPIFY_CLIENT_ID'),
         'client_secret' => env('SHOPIFY_CLIENT_SECRET'),

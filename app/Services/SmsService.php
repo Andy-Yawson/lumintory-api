@@ -15,9 +15,9 @@ class SmsService
 
     public function __construct()
     {
-        $this->baseUrl = env('SMS_BASE_URL');
-        $this->appId = env('SMS_APP_ID');
-        $this->appSecret = env('SMS_APP_SECRET');
+        $this->baseUrl = config('services.sms.base_url');
+        $this->appId = config('services.sms.app_id');
+        $this->appSecret = config('services.sms.app_secret');
     }
 
     public function queueSms($tenantId, $from, $to, $message)

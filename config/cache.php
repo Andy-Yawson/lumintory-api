@@ -53,6 +53,8 @@ return [
             'driver' => 'file',
             'path' => storage_path('framework/cache/data'),
             'lock_path' => storage_path('framework/cache/data'),
+            // Group-writable: the web server (www-data) and the worker/scheduler (ubuntu) share this cache.
+            'permission' => 0664,
         ],
 
         'memcached' => [
