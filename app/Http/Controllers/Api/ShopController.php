@@ -41,6 +41,7 @@ class ShopController extends Controller
             'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
         ]) + [
             'banner_url' => $shop->bannerUrl(),
+            'banner_framing' => $shop->bannerFraming(),
             'urls' => $shop->urls(),
             'live' => $shop->isLive(),
             'qualifies' => Shop::tenantQualifies($shop->tenant),
@@ -75,6 +76,9 @@ class ShopController extends Controller
             'pickup' => 'sometimes|boolean',
             'delivery' => 'sometimes|boolean',
             'delivery_note' => 'sometimes|nullable|string|max:200',
+            'banner_focus_x' => 'sometimes|integer|between:0,100',
+            'banner_focus_y' => 'sometimes|integer|between:0,100',
+            'banner_zoom' => 'sometimes|integer|between:100,300',
             'momo_network' => ['sometimes', 'nullable', Rule::in(Shop::MOMO_NETWORKS)],
             'momo_number' => ['sometimes', 'nullable', 'string', 'max:20', 'regex:/^[+\d\s-]{9,20}$/'],
             'momo_name' => 'sometimes|nullable|string|max:80',
@@ -125,7 +129,7 @@ class ShopController extends Controller
             return response()->json(['message' => 'Image storage is unavailable right now. Please try again shortly.'], 503);
         }
         $old = $shop->banner_path;
-        $shop->forceFill(['banner_path' => $path])->save();
+        $shop->forceFill(['banner_path' => $path, 'banner_focus_x' => 50, 'banner_focus_y' => 50, 'banner_zoom' => 100])->save();
         if ($old) {
             rescue(fn () => Storage::disk('media')->delete($old), report: true);
         }

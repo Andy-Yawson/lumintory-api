@@ -36,6 +36,7 @@ class ShopCatalog
             // The details themselves are only revealed after an order is placed.
             'accepts_momo' => (bool) $shop->momo(),
             'banner_url' => $shop->bannerUrl(),
+            'banner_framing' => $shop->bannerFraming(),
             'brand' => $tenant->brand,
             'currency' => $settings['currency'] ?? 'GHS',
             'currency_symbol' => $settings['currency_symbol'] ?? 'GH₵',
