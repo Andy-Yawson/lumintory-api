@@ -245,9 +245,9 @@ class ProductController extends Controller
      */
     public function importPreview(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240']);
+        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240', 'sheet' => 'nullable|integer|min:0']);
 
-        [$headers, $rows] = $this->readSpreadsheet($request->file('file'));
+        [$headers, $rows, $book] = $this->readSpreadsheet($request->file('file'), $request->filled('sheet') ? $request->integer('sheet') : null, '/product|stock|inventor|item|catalog/');
 
         if (empty($headers)) {
             return response()->json(['message' => 'That file looks empty.'], 422);
@@ -260,7 +260,7 @@ class ProductController extends Controller
             'fields' => ProductImportService::fieldCatalogue(),
             'suggested_mapping' => (object) ProductImportService::suggestMapping($headers),
             'row_limit' => PlanLimit::getLimit(Auth::user()->tenant, 'excel_import_rows'),
-        ]);
+        ] + $book);
     }
 
     /** Dry run of import(): same file + mapping, nothing is written; returns what each row would do. */
@@ -270,10 +270,11 @@ class ProductController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
             'mapping' => 'required|string',
             'duplicates' => 'nullable|in:skip,update',
+            'sheet' => 'nullable|integer|min:0',
         ]);
 
         $tenant = Auth::user()->tenant;
-        [, $rows] = $this->readSpreadsheet($request->file('file'));
+        [, $rows] = $this->readSpreadsheet($request->file('file'), $request->filled('sheet') ? $request->integer('sheet') : null, '/product|stock|inventor|item|catalog/');
 
         $mapping = array_map('intval', array_filter((array) json_decode($request->input('mapping'), true), fn ($v) => $v !== null && $v !== ''));
         if (! isset($mapping['name'])) {
@@ -295,10 +296,11 @@ class ProductController extends Controller
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
             'mapping' => 'nullable|string',
             'duplicates' => 'nullable|in:skip,update',
+            'sheet' => 'nullable|integer|min:0',
         ]);
 
         $tenant = Auth::user()->tenant;
-        [$headers, $rows] = $this->readSpreadsheet($request->file('file'));
+        [$headers, $rows] = $this->readSpreadsheet($request->file('file'), $request->filled('sheet') ? $request->integer('sheet') : null, '/product|stock|inventor|item|catalog/');
 
         $mapping = $request->filled('mapping')
             ? array_map('intval', array_filter((array) json_decode($request->input('mapping'), true), fn ($v) => $v !== null && $v !== ''))

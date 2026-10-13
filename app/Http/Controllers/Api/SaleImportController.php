@@ -29,8 +29,8 @@ class SaleImportController extends Controller
     public function preview(Request $request)
     {
         $this->authorizeAdmin();
-        $request->validate(['file' => self::FILE]);
-        [$headers, $rows] = $this->readSpreadsheet($request->file('file'));
+        $request->validate(['file' => self::FILE, 'sheet' => 'nullable|integer|min:0']);
+        [$headers, $rows, $book] = $this->readSpreadsheet($request->file('file'), $request->filled('sheet') ? $request->integer('sheet') : null, '/sale|order|transaction|receipt|invoice/');
 
         if (empty($headers)) {
             return response()->json(['message' => 'That file looks empty.'], 422);
@@ -43,7 +43,7 @@ class SaleImportController extends Controller
             'fields' => SalesImportService::fieldCatalogue(),
             'suggested_mapping' => (object) SalesImportService::suggestMapping($headers),
             'row_limit' => PlanLimit::getLimit(Auth::user()->tenant, 'excel_import_rows'),
-        ]);
+        ] + $book);
     }
 
     public function dryRun(Request $request, SalesImportService $importer)
@@ -95,8 +95,9 @@ class SaleImportController extends Controller
             'mapping' => 'required|string',
             'missing' => 'nullable|in:skip,create',
             'stock' => 'nullable|in:keep,deduct',
+            'sheet' => 'nullable|integer|min:0',
         ]);
-        [, $rows] = $this->readSpreadsheet($request->file('file'));
+        [, $rows] = $this->readSpreadsheet($request->file('file'), $request->filled('sheet') ? $request->integer('sheet') : null, '/sale|order|transaction|receipt|invoice/');
         $mapping = array_map('intval', array_filter((array) json_decode($request->input('mapping'), true), fn ($v) => $v !== null && $v !== ''));
 
         foreach (['product' => 'the product', 'quantity' => 'the quantity'] as $f => $label) {
