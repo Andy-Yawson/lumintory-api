@@ -33,6 +33,8 @@ class ShopCatalog
             'pickup' => $shop->pickup,
             'delivery' => $shop->delivery,
             'delivery_note' => $shop->delivery_note,
+            // The details themselves are only revealed after an order is placed.
+            'accepts_momo' => (bool) $shop->momo(),
             'banner_url' => $shop->bannerUrl(),
             'brand' => $tenant->brand,
             'currency' => $settings['currency'] ?? 'GHS',

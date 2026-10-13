@@ -43,13 +43,15 @@ class BrandController extends Controller
     {
         $tenant = $this->adminTenant();
         // No SVG: it can carry scripts, and the receipt PDF renderer can't draw it reliably.
-        $request->validate(['logo' => 'required|file|mimes:png,jpg,jpeg,webp|max:2048']);
+        $request->validate(['logo' => 'required|file|mimes:png,jpg,jpeg,webp|max:10240']);
 
         $file = $request->file('logo');
-        $path = "tenants/{$tenant->id}/brand/logo-".Str::uuid().'.'.$file->extension();
+        // Logos are shown small: 800px is plenty (PNG kept when the logo has a transparent background).
+        $optimized = \App\Services\ImageOptimizer::optimize($file->getContent(), 800, 85);
+        $path = "tenants/{$tenant->id}/brand/logo-".Str::uuid().'.'.($optimized['ext'] ?? $file->extension());
 
         try {
-            Storage::disk('media')->put($path, $file->getContent(), ['ContentType' => $file->getMimeType()]);
+            Storage::disk('media')->put($path, $optimized['bytes'] ?? $file->getContent(), ['ContentType' => $optimized['mime'] ?? $file->getMimeType()]);
         } catch (\Throwable $e) {
             report($e);
 

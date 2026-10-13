@@ -281,4 +281,33 @@ class ShopTest extends TestCase
         $this->getJson('/api/v1/public/feed')->assertOk()->assertJsonCount(1, 'data');
         $this->getJson('/api/v1/public/feed?shop=nope')->assertNotFound();
     }
+
+    public function test_momo_details_are_only_revealed_after_ordering(): void
+    {
+        Sanctum::actingAs($this->admin);
+        $this->putJson('/api/v1/shop', ['momo_number' => '024 555 0000'])->assertStatus(422)->assertJsonValidationErrors('momo_network');
+        $this->putJson('/api/v1/shop', ['momo_network' => 'Vodafone', 'momo_number' => '0245550000'])->assertStatus(422);
+        $this->putJson('/api/v1/shop', ['momo_network' => 'MTN', 'momo_number' => '+233 24 555 0000', 'momo_name' => 'Earle Boutique'])
+            ->assertOk()->assertJsonPath('momo_number', '0245550000');
+        $this->app['auth']->forgetGuards();
+
+        $shopJson = $this->getJson('/api/v1/public/shops/earles-closet')->assertOk()->json();
+        $this->assertTrue($shopJson['accepts_momo']);
+        $this->assertStringNotContainsString('0245550000', json_encode($shopJson), 'number not on public pages');
+
+        $p = $this->product('Bag');
+        $this->order([['product_id' => $p->id, 'quantity' => 1]])->assertCreated()
+            ->assertJsonPath('momo.network', 'MTN')->assertJsonPath('momo.number', '0245550000')->assertJsonPath('momo.name', 'Earle Boutique');
+
+        $sms = SmsLog::where('recipient', '233241234567')->latest('id')->value('message');
+        $this->assertStringContainsString('After they confirm, pay by MTN MoMo 0245550000 (Earle Boutique), reference #1001.', $sms);
+    }
+
+    public function test_order_alert_sms_falls_back_to_the_whatsapp_number(): void
+    {
+        $this->shop->update(['notify_phone' => null, 'whatsapp' => '0207778888']);
+        $p = $this->product('Bag');
+        $this->order([['product_id' => $p->id, 'quantity' => 1]])->assertCreated();
+        $this->assertTrue(SmsLog::where('recipient', '233207778888')->where('message', 'like', 'New shop order%')->exists());
+    }
 }

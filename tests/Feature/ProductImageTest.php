@@ -47,7 +47,7 @@ class ProductImageTest extends TestCase
     public function test_non_images_and_oversized_files_are_rejected(): void
     {
         $this->post("/api/v1/products/{$this->product->id}/images", ['image' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])->assertStatus(422);
-        $this->post("/api/v1/products/{$this->product->id}/images", ['image' => UploadedFile::fake()->image('big.jpg', 600, 600)->size(6000)], ['Accept' => 'application/json'])->assertStatus(422);
+        $this->post("/api/v1/products/{$this->product->id}/images", ['image' => UploadedFile::fake()->image('big.jpg', 600, 600)->size(16000)], ['Accept' => 'application/json'])->assertStatus(422);
     }
 
     public function test_make_primary_and_delete_renumber_and_remove_the_file(): void
