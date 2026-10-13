@@ -62,8 +62,8 @@ class ProductVideoTest extends TestCase
         $id = $this->postJson("/api/v1/products/{$p}/videos", ['size' => 8, 'type' => 'video/mp4'])->json('video.id');
         $send = fn ($i, $c) => $this->post("/api/v1/products/{$p}/videos/{$id}/chunk", ['index' => $i, 'chunk' => UploadedFile::fake()->createWithContent('c', $c)], ['Accept' => 'application/json']);
 
-        $send(1, 'efgh')->assertStatus(422);
-        $send(0, 'abcd')->assertOk();
+        $send('1', 'efgh')->assertStatus(422); // browsers send the index as text ("1")
+        $send('0', 'abcd')->assertOk();
         $send(0, 'abcd')->assertOk()->assertJsonPath('received', 1); // retry: not appended twice
         $this->postJson("/api/v1/products/{$p}/videos/{$id}/complete")->assertStatus(422); // incomplete
     }

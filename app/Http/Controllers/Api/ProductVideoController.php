@@ -76,10 +76,10 @@ class ProductVideoController extends Controller
         abort_unless($video->status === 'uploading', 422, 'This upload is already finished.');
 
         // Chunks arrive in order; a repeated chunk (retry after a timeout) is acknowledged, not appended twice.
-        if ($data['index'] < $video->chunks_received) {
+        if ((int) $data['index'] < $video->chunks_received) {
             return response()->json(['received' => $video->chunks_received]);
         }
-        abort_unless($data['index'] === $video->chunks_received, 422, 'Chunks arrived out of order. Please try the upload again.');
+        abort_unless((int) $data['index'] === $video->chunks_received, 422, 'Chunks arrived out of order. Please try the upload again.');
 
         $written = file_put_contents($video->partPath(), $request->file('chunk')->getContent(), FILE_APPEND);
         abort_if($written === false, 500, 'Could not save the upload.');
