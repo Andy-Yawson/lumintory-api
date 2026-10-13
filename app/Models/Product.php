@@ -33,6 +33,8 @@ class Product extends Model
         'quantity' => 'float',
         'unit_price' => 'float',
         'lead_time_days' => 'integer',
+        // Listed on the online shop. Changed only through /shop/visibility, so not fillable.
+        'shop_visible' => 'boolean',
     ];
 
     protected $appends = [
@@ -144,5 +146,12 @@ class Product extends Model
             $total = (float) $this->variations()->sum('quantity');
             $this->update(['quantity' => $total]);
         }
+    }
+
+    /** Public shop pages show this model: refresh the shop site's cache when it changes. */
+    protected static function booted(): void
+    {
+        static::saved(fn () => \App\Services\Shop\ShopCache::bust());
+        static::deleted(fn () => \App\Services\Shop\ShopCache::bust());
     }
 }

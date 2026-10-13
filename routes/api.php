@@ -33,6 +33,8 @@ use App\Http\Controllers\Api\StoreWebhookController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\PublicShopController;
+use App\Http\Controllers\Api\ShopController;
 use App\Http\Controllers\Api\SaleImportController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\ZinnvyAiController;
@@ -69,6 +71,21 @@ Route::get('/v1/plans', [PlanController::class, 'index']);
 
 
 // Signing out always works, even for a deactivated workspace.
+// Online shop (shop.zinnvy.com): public, read-mostly, rate limited.
+Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
+    Route::get('shop-config', [PublicShopController::class, 'config']);
+    Route::get('marketplace/products', [PublicShopController::class, 'marketplaceProducts']);
+    Route::get('marketplace/shops', [PublicShopController::class, 'marketplaceShops']);
+    Route::get('marketplace/categories', [PublicShopController::class, 'marketplaceCategories']);
+    Route::get('sitemap', [PublicShopController::class, 'sitemap']);
+    Route::get('feed', [PublicShopController::class, 'feed']);
+    Route::get('shops/{ref}', [PublicShopController::class, 'shop']);
+    Route::get('shops/{ref}/products', [PublicShopController::class, 'products']);
+    Route::get('shops/{ref}/products/{id}', [PublicShopController::class, 'product'])->whereNumber('id');
+});
+Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
+Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
+
 Route::middleware(['auth:sanctum'])->post('/v1/logout', [AuthController::class, 'logout']);
 
 Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(function () {
@@ -81,6 +98,16 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::post('activate-subscription', [AuthController::class, 'activateSubscription']);
     Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
     Route::post('/tenant/settings', [TenantSettingsController::class, 'update']);
+    Route::get('/shop', [ShopController::class, 'show']);
+    Route::put('/shop', [ShopController::class, 'update']);
+    Route::post('/shop/banner', [ShopController::class, 'uploadBanner']);
+    Route::delete('/shop/banner', [ShopController::class, 'removeBanner']);
+    Route::post('/shop/visibility', [ShopController::class, 'visibility']);
+    Route::post('/shop/blocked-phones', [ShopController::class, 'blockPhone']);
+    Route::get('/shop/orders', [ShopController::class, 'orders']);
+    Route::get('/shop/orders/{id}', [ShopController::class, 'order'])->whereNumber('id');
+    Route::patch('/shop/orders/{id}', [ShopController::class, 'updateOrder'])->whereNumber('id');
+    Route::post('/shop/orders/{id}/convert', [ShopController::class, 'convert'])->whereNumber('id');
     Route::get('/tenant/brand', [BrandController::class, 'show']);
     Route::post('/tenant/brand', [BrandController::class, 'update']);
     Route::post('/tenant/brand/logo', [BrandController::class, 'uploadLogo']);
@@ -213,6 +240,7 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fun
     Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show']);
     Route::patch('/tenants/{tenant}', [AdminTenantController::class, 'update']);
     Route::get('/tenants/{tenant}/usage', [AdminTenantController::class, 'usage']);
+    Route::post('/tenants/{tenant}/shop/moderation', [AdminTenantController::class, 'moderateShop']);
 
     // Subscriptions (v1: summary + expiring)
     Route::get('/subscriptions/summary', [AdminSubscriptionController::class, 'summary']);
