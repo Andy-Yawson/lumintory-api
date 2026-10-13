@@ -92,7 +92,7 @@ class TokenController extends Controller
 
         return response()->json([
             'referral_code' => $tenant->referral_code,
-            'referral_link' => env('FRONTEND_URL') . '/register?ref=' . $tenant->referral_code,
+            'referral_link' => rtrim((string) config('services.frontend_url'), '/') . '/register?ref=' . $tenant->referral_code,
             'referrals' => $referrals,
             'referrals_count' => $referrals->count(),
             'tokens_from_referrals' => $referrals->sum('tokens_awarded'),

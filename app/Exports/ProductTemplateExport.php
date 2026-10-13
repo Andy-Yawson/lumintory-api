@@ -32,7 +32,7 @@ class ProductTemplateExport implements FromArray, WithHeadings
                 50,
                 100,
                 null,
-                'Large:110:20 | Medium:86:30 (Format: Name:Price:Stock | Name:Price:Stock)',
+                'Large:110:20 | Medium:86:30',
             ],
         ];
     }

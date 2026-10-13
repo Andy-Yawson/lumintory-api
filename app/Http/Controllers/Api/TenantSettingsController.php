@@ -23,7 +23,7 @@ class TenantSettingsController extends Controller
             'success' => true,
             'data' => [
                 'currency' => $tenant->settings['currency'] ?? 'GHS',
-                'currency_symbol' => $tenant->settings['currency_symbol'] ?? '₵',
+                'currency_symbol' => $tenant->settings['currency_symbol'] ?? 'GH₵',
             ],
         ]);
     }
@@ -40,15 +40,19 @@ class TenantSettingsController extends Controller
             ], 404);
         }
 
+        if (Auth::user()->role !== 'Administrator') {
+            abort(403, 'Only a workspace Administrator can change workspace settings.');
+        }
+
         $validated = $request->validate([
-            'currency' => 'required|string|max:3',
+            'currency' => 'required|string|size:3',
         ]);
 
         $currency = strtoupper($validated['currency']);
 
         // simple map of currency -> symbol (you can expand this)
         $symbols = [
-            'GHS' => '₵',
+            'GHS' => 'GH₵',
             'NGN' => '₦',
             'USD' => '$',
             'EUR' => '€',

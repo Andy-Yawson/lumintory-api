@@ -73,7 +73,11 @@ class SupportTicketController extends Controller
     public function show(SupportTicket $ticket)
     {
         $this->authorizeTenant($ticket);
-        $ticket->load(['user', 'assignee', 'messages.user']);
+        // Internal staff notes never leave the support team.
+        $ticket->load([
+            'user', 'assignee',
+            'messages' => fn ($q) => $q->where('is_internal', false)->with('user')->orderBy('created_at'),
+        ]);
         return $ticket;
     }
 

@@ -24,8 +24,12 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProductForecastController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SmsController;
+use App\Http\Controllers\Api\PaySubscriptionController;
+use App\Http\Controllers\Api\PayWebhookController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\StoreConnectionController;
+use App\Http\Controllers\Api\StoreWebhookController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\ZinnvyAiController;
@@ -37,6 +41,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/v1/auth/zinnvy/redirect', [ZinnvyAuthController::class, 'redirect']);
 Route::get('/v1/auth/zinnvy/callback', [ZinnvyAuthController::class, 'callback']);
 Route::post('/v1/auth/zinnvy/handoff', [ZinnvyAuthController::class, 'handoff'])->middleware('throttle:10,1');
+Route::get('/v1/auth/zinnvy/signup/{code}', [ZinnvyAuthController::class, 'signupInfo'])->middleware('throttle:20,1');
+Route::post('/v1/auth/zinnvy/signup', [ZinnvyAuthController::class, 'completeSignup'])->middleware('throttle:10,1');
 
 Route::post('/v1/login', [AuthController::class, 'login'])->middleware('throttle:3,1');
 Route::post('/v1/register-tenant', [AuthController::class, 'registerTenant'])->middleware('throttle:3,1');
@@ -48,15 +54,26 @@ Route::post('/sms/callback', [SmsController::class, 'deliveryCallback'])->name('
 Route::post('/v1/contact-us', [AuthController::class, 'contactUs'])->middleware('throttle:3,1');
 Route::post('/v1/send-custom-mail', [GeneralController::class, 'sendEmail'])->middleware('throttle:3,1');
 
+// --- Online stores: provider callbacks + webhooks (public; verified by signature / one-time state) ---
+Route::get('/v1/stores/shopify/callback', [StoreConnectionController::class, 'shopifyCallback']);
+Route::post('/v1/stores/woocommerce/callback', [StoreConnectionController::class, 'wooCallback'])->middleware('throttle:30,1');
+Route::post('/v1/webhooks/pay', PayWebhookController::class);   // Zinnvy Pay; verified by signature
+Route::post('/v1/webhooks/shopify', [StoreWebhookController::class, 'shopify']);
+Route::post('/v1/webhooks/woocommerce/{uuid}', [StoreWebhookController::class, 'woocommerce']);
+
 // Public: available plans for tenant upgrade page
 Route::get('/v1/plans', [PlanController::class, 'index']);
 
 
-Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+// Signing out always works, even for a deactivated workspace.
+Route::middleware(['auth:sanctum'])->post('/v1/logout', [AuthController::class, 'logout']);
+
+Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/add-user', [AuthController::class, 'addUser'])->middleware('limit.users');
     Route::get('/users', [AuthController::class, 'listUsers']);
+    Route::post('/users/{user}/resend-invite', [AuthController::class, 'resendInvite']);
+    Route::delete('/users/{user}', [AuthController::class, 'removeUser']);
     Route::post('/password/change', [AuthController::class, 'changePassword']);
     Route::post('activate-subscription', [AuthController::class, 'activateSubscription']);
     Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
@@ -68,6 +85,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('products/low-stock', [ProductController::class, 'lowStock']);
     Route::apiResource('products', ProductController::class);
     Route::get('products/import/template', [ProductController::class, 'downloadTemplate']);
+    Route::post('products/import/preview', [ProductController::class, 'importPreview']);
+    Route::post('products/import/dry-run', [ProductController::class, 'importDryRun']);
     Route::post('products/import', [ProductController::class, 'import']);
     Route::post('products/{id}/add-stock', [ProductController::class, 'addStock']);
 
@@ -96,6 +115,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/reports/usage', [ReportController::class, 'index']);
 
     Route::post('/subscription', [SubscriptionController::class, 'update']);
+    Route::post('/subscription/checkout', [PaySubscriptionController::class, 'checkout'])->middleware('throttle:10,1');
+    Route::post('/subscription/confirm', [PaySubscriptionController::class, 'confirm'])->middleware('throttle:30,1');
     Route::get('/sales/{sale}/receipt', [SaleController::class, 'receipt']);
 
     Route::post('/rewards/daily-login', [TokenController::class, 'dailyLogin']);
@@ -111,8 +132,10 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('/product-forecasts', [ProductForecastController::class, 'index']);
     Route::get('/inventory-insights', [ProductForecastController::class, 'dashboardInsights']);
 
-    Route::get('/audit/logs', [AuditLogController::class, 'index']);
-    Route::get('/audit/stats', [AuditLogController::class, 'stats']);
+    Route::middleware('workspace.admin')->group(function () {
+        Route::get('/audit/logs', [AuditLogController::class, 'index']);
+        Route::get('/audit/stats', [AuditLogController::class, 'stats']);
+    });
 
     // ------- Suppot Ticket -------
     Route::get('/support-tickets/analytics', [SupportTicketController::class, 'analytics']);
@@ -124,13 +147,25 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
 
     // ----- Zinnvy AI "Connect with Zinnvy" provisioning (P4-C) -----
-    Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision']);
+    Route::post('/integrations/ai/provision', [\App\Http\Controllers\Api\AiConnectController::class, 'provision'])->middleware('workspace.admin');
+
+    //----- Online stores (Shopify / WooCommerce) ------
+    Route::middleware('workspace.admin')->group(function () {
+    Route::get('/stores', [StoreConnectionController::class, 'index']);
+    Route::middleware('feature:shopify_woo')->group(function () {
+        Route::post('/stores/shopify/connect', [StoreConnectionController::class, 'shopifyConnect']);
+        Route::post('/stores/woocommerce/connect', [StoreConnectionController::class, 'wooConnect']);
+        Route::post('/stores/woocommerce/keys', [StoreConnectionController::class, 'wooKeys']);
+        Route::post('/stores/{connection}/sync', [StoreConnectionController::class, 'sync']);
+    });
+    Route::delete('/stores/{connection}', [StoreConnectionController::class, 'destroy']);
 
     //----- Custom Integration Keys ------
     Route::get('/integration-keys', [IntegrationApiKeyController::class, 'index']);
     Route::post('/integration-keys', [IntegrationApiKeyController::class, 'store']);
     Route::put('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'update']);
     Route::delete('/integration-keys/{integrationApiKey}', [IntegrationApiKeyController::class, 'destroy']);
+    }); // workspace.admin: stores + integration keys
 
 });
 

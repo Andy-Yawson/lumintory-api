@@ -101,8 +101,10 @@ class AdminTenantController extends Controller
 
     public function usage(Tenant $tenant)
     {
-        $productsCount = Product::where('tenant_id', $tenant->id)->count();
-        $customersCount = Customer::where('tenant_id', $tenant->id)->count();
+        // Product/Customer carry a TenantScope keyed to the *caller's* tenant; an admin looking at
+        // someone else's workspace must bypass it or every count comes back 0.
+        $productsCount = Product::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count();
+        $customersCount = Customer::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count();
 
         $smsCredit = SmsCredit::where('tenant_id', $tenant->id)->first();
 

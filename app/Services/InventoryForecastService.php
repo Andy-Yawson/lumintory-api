@@ -6,11 +6,8 @@ use App\Models\Sale;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\ProductForecast;
-use App\Models\User;
-use App\Helpers\MailHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class InventoryForecastService
 {
@@ -178,46 +175,8 @@ class InventoryForecastService
             'forecasted_at' => now(),
         ]);
 
-        // Notification cooldown is independent of record creation above.
-        // The forecast is recomputed from real, noisy daily-sales data every
-        // 3 hours, so a borderline item can flip warning/critical/ok run to
-        // run — without this, every flip re-triggered $shouldCreate above
-        // and emailed every admin again, which is what made this "send too
-        // frequently" in the first place. Now: at most one email per
-        // product (or variation) every 24 hours, except an immediate alert
-        // the moment something first crosses into critical.
-        $lastNotified = ProductForecast::where('product_id', $product->id)
-            ->where('product_variation_id', $variationId)
-            ->whereNotNull('notified_at')
-            ->orderByDesc('notified_at')
-            ->first();
-
-        $isNewEscalationToCritical = $risk === 'critical'
-            && (!$lastNotified || $lastNotified->stock_risk_level !== 'critical');
-
-        $shouldNotify = $isNewEscalationToCritical
-            || !$lastNotified
-            || $lastNotified->notified_at->lt(now()->subHours(24));
-
-        if (!$shouldNotify) {
-            return;
-        }
-
-        $admins = User::where('tenant_id', $product->tenant_id)
-            ->where('role', 'Administrator')
-            ->get();
-
-        foreach ($admins as $admin) {
-            try {
-                MailHelper::sendLowStockForecastEmail($admin, $forecast);
-            } catch (\Throwable $e) {
-                // One bad address/mail failure shouldn't stop the rest of
-                // this tenant's admins (or the next tenant) from being
-                // notified in the same scheduled run.
-                Log::error("Low-stock forecast email failed for admin #{$admin->id}: {$e->getMessage()}");
-            }
-        }
-
-        $forecast->forceFill(['notified_at' => now()])->save();
+        // At-risk items are shown in the dashboard (notification bell + Stock forecast page, read from
+        // /inventory-insights) instead of being emailed: the emails arrived several times a day and were
+        // unreliable. Nothing is sent from here any more.
     }
 }

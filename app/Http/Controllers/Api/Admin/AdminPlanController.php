@@ -24,7 +24,7 @@ class AdminPlanController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'          => 'required|string|alpha_dash|unique:subscription_plans,name',
+            'name'          => 'required|string|alpha_dash|max:32|unique:subscription_plans,name',
             'label'         => 'required|string|max:80',
             'price_monthly' => 'nullable|numeric|min:0',
             'price_yearly'  => 'nullable|numeric|min:0',
@@ -95,15 +95,16 @@ class AdminPlanController extends Controller
             'is_active'             => true,
         ]);
 
-        // Determine event type
-        $planOrder = ['basic' => 1, 'pro' => 2, 'custom' => 3];
-        $fromOrder = $planOrder[$fromPlan] ?? 1;
-        $toOrder   = $planOrder[$data['plan']] ?? 1;
+        // Upgrade vs downgrade by monthly price (plans are admin-editable, so no hardcoded order).
+        // A plan without a price (e.g. "Custom", priced on request) ranks highest.
+        $rank = fn (?string $name) => ($p = SubscriptionPlan::where('name', $name)->first())
+            ? ($p->price_monthly === null ? PHP_INT_MAX : (float) $p->price_monthly)
+            : 0;
 
         $eventType = match (true) {
-            $fromPlan === $data['plan'] => 'renewal',
-            $toOrder > $fromOrder       => 'upgrade',
-            default                     => 'downgrade',
+            $fromPlan === $data['plan']                => 'renewal',
+            $rank($data['plan']) > $rank($fromPlan)    => 'upgrade',
+            default                                    => 'downgrade',
         };
 
         SubscriptionHistory::create([

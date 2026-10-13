@@ -32,6 +32,13 @@ class ReportController extends Controller
         return response()->json([
             'sales_this_month' => $salesCount,
             'returns_this_month' => $returnsCount,
+            // The workspace's real plan limits (null = unlimited), so the UI never hardcodes them.
+            'plan' => $tenant->plan,
+            'limits' => [
+                'sales_per_month' => PlanLimit::getLimit($tenant, 'sales_per_month'),
+                'returns_per_month' => PlanLimit::getLimit($tenant, 'returns_per_month'),
+                'reports' => PlanLimit::getLimit($tenant, 'reports', 'basic'),
+            ],
         ]);
     }
 

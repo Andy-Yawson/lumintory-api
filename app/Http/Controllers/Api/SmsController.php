@@ -8,6 +8,7 @@ use App\Models\SmsCredit;
 use App\Models\SmsLog;
 use App\Services\SmsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class SmsController extends Controller
@@ -16,38 +17,11 @@ class SmsController extends Controller
     {
         $data = $request->validate([
             'message' => 'required|string|max:160',
-            'recipients' => 'required|array|min:1'
+            'recipients' => 'required|array|min:1',
+            'recipients.*' => 'string',
         ]);
 
-        $tenant = Auth::user()->tenant;
-        $credits = SmsCredit::where('tenant_id', $tenant->id)->first();
-
-        $segments = $sms->calculateSegments($data['message']);
-        $totalRequired = count($data['recipients']) * $segments;
-
-        if ($credits->credits < $totalRequired) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient SMS credits.'
-            ], 422);
-        }
-
-        $credits->decrement('credits', $totalRequired);
-
-        foreach ($data['recipients'] as $recipient) {
-            $sms->queueSms(
-                tenantId: $tenant->id,
-                from: $tenant->name,
-                to: $recipient,
-                message: $data['message']
-            );
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'SMS queued.',
-            'remaining_credits' => $credits->fresh()->credits
-        ]);
+        return $this->charge_and_queue($sms, collect($data['recipients']), $data['message'], 'SMS queued.');
     }
 
     public function sendBulk(Request $request, SmsService $sms)
@@ -62,12 +36,10 @@ class SmsController extends Controller
             'filters' => 'nullable|array',
         ]);
 
-        $tenant = Auth::user()->tenant;
-
         if ($data['mode'] === 'selected') {
             $recipients = collect($data['recipients'] ?? []);
         } else {
-            $query = Customer::where('tenant_id', $tenant->id);
+            $query = Customer::where('tenant_id', Auth::user()->tenant_id);
 
             if (!empty($data['filters']['search'])) {
                 $search = $data['filters']['search'];
@@ -81,52 +53,55 @@ class SmsController extends Controller
             $recipients = $query->pluck('phone');
         }
 
-        // Remove nulls and invalid
-        $recipients = $recipients
-            ->map(fn($n) => SmsService::normalizePhone($n))
+        return $this->charge_and_queue($sms, $recipients, $data['message'], 'Bulk SMS has been queued.');
+    }
+
+    /**
+     * Normalise + de-duplicate the numbers, charge exactly that many messages, and queue exactly
+     * those numbers, in one transaction: credits are never taken for messages that aren't sent.
+     */
+    private function charge_and_queue(SmsService $sms, $recipients, string $message, string $okMessage)
+    {
+        $tenant = Auth::user()->tenant;
+
+        $recipients = collect($recipients)
+            ->map(fn ($n) => SmsService::normalizePhone($n))
             ->filter()
             ->unique()
             ->values();
 
         if ($recipients->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No valid recipients found.',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'No valid phone numbers to send to.'], 422);
         }
 
-        $message = $data['message'];
         $segments = SmsService::segments($message);
-        $totalSmsNeeded = $segments * $recipients->count();
+        $needed = $segments * $recipients->count();
 
-        $smsCredit = SmsCredit::where('tenant_id', $tenant->id)->first();
+        return DB::transaction(function () use ($sms, $tenant, $recipients, $message, $segments, $needed, $okMessage) {
+            $credits = SmsCredit::lockForUpdate()->firstOrCreate(['tenant_id' => $tenant->id], ['credits' => 0]);
 
-        if ($smsCredit->credits < $totalSmsNeeded) {
+            if ($credits->credits < $needed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Not enough SMS credits: this needs {$needed}, you have {$credits->credits}.",
+                ], 422);
+            }
+
+            $credits->decrement('credits', $needed);
+
+            foreach ($recipients as $number) {
+                $sms->queueSms(tenantId: $tenant->id, from: $tenant->name, to: $number, message: $message);
+            }
+
             return response()->json([
-                'success' => false,
-                'message' => "Insufficient SMS credits. Required: {$totalSmsNeeded}, Available: {$smsCredit->credits}",
-            ], 422);
-        }
-
-        $smsCredit->decrement('credits', $totalSmsNeeded);
-
-        foreach ($data['recipients'] as $recipient) {
-            $sms->queueSms(
-                tenantId: $tenant->id,
-                from: $tenant->name,
-                to: $recipient,
-                message: $data['message'],
-            );
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Bulk SMS has been queued.',
-            'recipients' => $recipients->count(),
-            'segments_per_recipient' => $segments,
-            'charged_sms' => $totalSmsNeeded,
-            'remaining_credits' => $smsCredit->fresh()->credits,
-        ]);
+                'success' => true,
+                'message' => $okMessage,
+                'recipients' => $recipients->count(),
+                'segments_per_recipient' => $segments,
+                'charged_sms' => $needed,
+                'remaining_credits' => $credits->fresh()->credits,
+            ]);
+        });
     }
 
     public function getSMSCredit(Request $request)

@@ -34,7 +34,7 @@ class PasswordResetController extends Controller
                 'created_at' => now(),
             ]);
 
-            $resetUrl = env('FRONTEND_URL') . '/reset-password?token=' . $plainToken . '&email=' . urlencode($user->email);
+            $resetUrl = rtrim((string) config('services.frontend_url'), '/') . '/reset-password?token=' . $plainToken . '&email=' . urlencode($user->email);
 
             // Mail::to($user->email)->send(new PasswordResetMail($user, $resetUrl));
             return response()->json(['success' => true, 'message' => 'If that email exists, a reset link has been sent.']);

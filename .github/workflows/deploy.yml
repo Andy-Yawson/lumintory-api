@@ -1,9 +1,10 @@
-name: Deploy Zinnvy APIs to Test Environment
+name: Deploy Zinnvy APIs
 
 on:
   push:
     branches:
       - develop
+      - master
 
 jobs:
   deploy:
@@ -15,60 +16,79 @@ jobs:
 
       - name: Deploy via SSH 🧞‍♂️
         uses: appleboy/ssh-action@master
+        env:
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEMO_OWNER_EMAIL: ${{ secrets.DEMO_OWNER_EMAIL }}
         with:
+          envs: DEMO_PASSWORD,DEMO_OWNER_EMAIL
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
 
-            echo "Marking the directory as safe for Git..."
-            sudo git config --global --add safe.directory /var/www/zinnvy-api-test
+            echo "Determining target directory and branch..."
+            if [ "${GITHUB_REF##*/}" = "master" ]; then
+              APP_DIR="/var/www/zinnvy-api"
+              GIT_BRANCH="master"
+            else
+              APP_DIR="/var/www/zinnvy-api-test"
+              GIT_BRANCH="develop"
+            fi
 
+            echo "Using app directory: $APP_DIR"
+            echo "Using git branch: $GIT_BRANCH"
+
+            echo "Marking the directory as safe for Git..."
+            sudo git config --global --add safe.directory "$APP_DIR"
 
             echo "Starting deployment..."
-            cd /var/www/zinnvy-api-test || { echo "Failed to navigate to project directory"; exit 1; }
+            cd "$APP_DIR" || { echo "Failed to navigate to project directory"; exit 1; }
 
             echo "Pulling latest code..."
-            sudo git checkout develop
-            sudo git reset --hard
-            sudo -E env "GIT_SSH_COMMAND=ssh -i ${{ secrets.SSH_PRIVATE_KEY }}" git pull origin develop
+            sudo git fetch origin
+            sudo git checkout "$GIT_BRANCH"
+            sudo git reset --hard "origin/$GIT_BRANCH"
+            sudo git pull origin "$GIT_BRANCH"
 
             echo "Installing composer dependencies..."
             sudo composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
+            # Laravel writes cache/log files. Artisan below runs as the deploy user (ubuntu), the same
+            # user as the queue worker and the scheduler cron, never as root (root-owned cache files
+            # caused 500s). The setgid bit keeps new files in the www-data group so the web server can
+            # write them too (cache/log files are created 0664, see config/cache.php + logging.php).
+            echo "Fixing file ownership and permissions..."
+            sudo chown -R ubuntu:www-data storage bootstrap/cache
+            sudo chmod -R ug+rwX storage bootstrap/cache
+            sudo find storage bootstrap/cache -type d -exec chmod g+s {} +
+            ARTISAN="php artisan"
+
             echo "Migrating database..."
-            sudo php artisan migrate --force
+            $ARTISAN migrate --force
 
             echo "Database Seeding..."
-            sudo php artisan db:seed --force
+            $ARTISAN db:seed --force
+
+            # End-to-end demo data: STAGING (develop) ONLY. StagingSeeder also refuses to
+            # run unless SEED_DEMO_DATA=true, which is only ever set here, inline, on develop.
+            # DEMO_PASSWORD / DEMO_OWNER_EMAIL are optional repo secrets (see database/seeders/README.md).
+            if [ "$GIT_BRANCH" = "develop" ]; then
+              echo "Seeding staging demo data (develop only)..."
+              env SEED_DEMO_DATA=true DEMO_PASSWORD="$DEMO_PASSWORD" DEMO_OWNER_EMAIL="$DEMO_OWNER_EMAIL" \
+                php artisan db:seed --class='Database\Seeders\StagingSeeder' --force
+            fi
 
             echo "Linking storage..."
             sudo php artisan storage:link || true
 
-            echo "Fixing file ownership and permissions..."
-            sudo chown -R ubuntu:www-data storage bootstrap/cache
-            sudo chmod -R ug+rwx storage bootstrap/cache storage/logs
+            echo "Rebuilding caches (config, routes, views)..."
+            $ARTISAN optimize:clear
+            $ARTISAN optimize
 
-            echo "Clearing caches..."
-            sudo php artisan route:clear
-            sudo php artisan cache:clear || true
-            sudo php artisan config:clear
-
-            echo "Optimizing application..."
-            sudo php artisan optimize || true
-
-            sudo composer dump-autoload
-
-            echo "Restarting Laravel queues..."
-            sudo php artisan queue:restart
-
-            echo "Restarting Supervisor workers..."
-            sudo supervisorctl reread
-            sudo supervisorctl update
-            sudo supervisorctl restart all
-
-            sudo php artisan config:clear
-            sudo php artisan cache:clear || true
+            echo "Restarting this app's queue worker only (the server hosts other apps)..."
+            $ARTISAN queue:restart
+            if [ "$GIT_BRANCH" = "master" ]; then WORKER="zinnvy-api-prod-worker:*"; else WORKER="zinnvy-api-test-worker:*"; fi
+            sudo supervisorctl restart "$WORKER"
 
             echo "Deployment completed successfully! 🎉"

@@ -13,10 +13,23 @@ class AuditLogController extends Controller
     {
         $tenantId = $request->user()->tenant_id;
 
-        $query = AuditLog::where('tenant_id', $tenantId)->latest();
+        $query = AuditLog::where('tenant_id', $tenantId)
+            ->with('user:id,name,email')
+            ->latest();
 
         if ($request->filled('event')) {
             $query->where('event', 'like', '%' . $request->event . '%');
+        }
+
+        if ($request->filled('method')) {
+            $query->where('method', strtoupper($request->method));
+        }
+
+        if ($request->filled('search')) {
+            $term = '%' . $request->search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('event', 'like', $term)->orWhere('route', 'like', $term);
+            });
         }
 
         if ($request->filled('user_id')) {

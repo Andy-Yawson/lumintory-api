@@ -31,4 +31,28 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Zinnvy Pay: Inventory subscriptions are paid through it (never a provider directly).
+    'pay' => [
+        'url' => env('PAY_API_URL'),
+        'secret_key' => env('PAY_SECRET_KEY'),
+        'webhook_secret' => env('PAY_WEBHOOK_SECRET'),
+    ],
+
+    // Public URL of the Inventory web app; OAuth callbacks send people back here.
+    'frontend_url' => env('FRONTEND_URL'),
+
+    // SMS provider (read through config so it keeps working when config is cached).
+    'sms' => [
+        'base_url' => env('SMS_BASE_URL'),
+        'app_id' => env('SMS_APP_ID'),
+        'app_secret' => env('SMS_APP_SECRET'),
+    ],
+
+    'shopify' => [
+        'client_id' => env('SHOPIFY_CLIENT_ID'),
+        'client_secret' => env('SHOPIFY_CLIENT_SECRET'),
+        'scopes' => env('SHOPIFY_SCOPES', 'read_products,read_inventory,read_orders'),
+        'api_version' => env('SHOPIFY_API_VERSION', '2026-07'),
+    ],
+
 ];

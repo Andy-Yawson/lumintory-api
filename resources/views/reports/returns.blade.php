@@ -107,7 +107,7 @@
 
         .reason-text {
             font-size: 8pt;
-            color: #64748b;
+            color: #738078;
             font-style: italic;
         }
 
@@ -117,8 +117,8 @@
             width: 100%;
             font-size: 8pt;
             text-align: center;
-            color: #94a3b8;
-            border-top: 1px solid #e2e8f0;
+            color: #8a958a;
+            border-top: 1px solid #e0e4dd;
             padding-top: 5px;
         }
     </style>
@@ -133,7 +133,7 @@
             <tr>
                 <td>
                     <h1 class="report-title">Returns & Refunds</h1>
-                    <p style="margin: 5px 0 0 0; color: #64748b;">Period: {{ $summary['period'] ?? 'Full Audit' }}</p>
+                    <p style="margin: 5px 0 0 0; color: #738078;">Period: {{ $summary['period'] ?? 'Full Audit' }}</p>
                 </td>
                 <td class="company-info">
                     <strong>Total Returns:</strong> {{ count($returns) }}<br>
@@ -179,7 +179,7 @@
                     <td>{{ $r->return_date->format('d/m/y') }}</td>
                     <td>
                         <strong>{{ $r->product->name ?? 'Deleted Product' }}</strong><br>
-                        <span style="font-size: 8pt; color: #64748b;">
+                        <span style="font-size: 8pt; color: #738078;">
                             {{ $r->variation?->name ?? ($r->color ?? 'Standard') }}
                         </span>
                     </td>

@@ -15,9 +15,9 @@ class SmsService
 
     public function __construct()
     {
-        $this->baseUrl = env('SMS_BASE_URL');
-        $this->appId = env('SMS_APP_ID');
-        $this->appSecret = env('SMS_APP_SECRET');
+        $this->baseUrl = config('services.sms.base_url');
+        $this->appId = config('services.sms.app_id');
+        $this->appSecret = config('services.sms.app_secret');
     }
 
     public function queueSms($tenantId, $from, $to, $message)
@@ -77,10 +77,10 @@ class SmsService
         }
     }
 
+    /** Same rule everywhere: one SMS up to 160 characters, then 153 per part. */
     public function calculateSegments($message)
     {
-        $len = mb_strlen($message);
-        return (int) ceil($len / 160);
+        return self::segments((string) $message);
     }
 
     public function getProviderBalance()
