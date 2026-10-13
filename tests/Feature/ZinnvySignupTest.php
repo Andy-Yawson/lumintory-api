@@ -125,4 +125,15 @@ class ZinnvySignupTest extends TestCase
         $this->assertDatabaseCount('tenants', 0);
         $this->assertDatabaseCount('users', 0);
     }
+
+    public function test_a_new_workspace_gets_pro_free_for_one_year(): void
+    {
+        $code = $this->arriveFromIdentity(['sub' => 'z-9', 'email' => 'free@example.com', 'email_verified' => true, 'name' => 'Free']);
+        $this->postJson('/api/v1/auth/zinnvy/signup', ['code' => $code, 'tenant_name' => 'Free Shop'])->assertCreated();
+
+        $tenant = Tenant::where('name', 'Free Shop')->firstOrFail();
+        $this->assertSame('pro', $tenant->plan);
+        $this->assertTrue((bool) $tenant->is_active);
+        $this->assertTrue(\Illuminate\Support\Carbon::parse($tenant->subscription_ends_at)->between(now()->addYear()->subDay(), now()->addYear()->addDay()));
+    }
 }
