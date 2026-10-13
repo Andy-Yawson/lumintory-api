@@ -33,6 +33,8 @@ class Product extends Model
         'quantity' => 'float',
         'unit_price' => 'float',
         'lead_time_days' => 'integer',
+        // Listed on the online shop. Changed only through /shop/visibility, so not fillable.
+        'shop_visible' => 'boolean',
     ];
 
     protected $appends = [

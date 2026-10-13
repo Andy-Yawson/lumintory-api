@@ -62,8 +62,25 @@ class AdminTenantController extends Controller
     public function show(Tenant $tenant)
     {
         $tenant->load('users:id,name,email,tenant_id');
+        $shop = \App\Models\Shop::where('tenant_id', $tenant->id)->first();
 
-        return response()->json($tenant);
+        return response()->json($tenant->toArray() + ['shop' => $shop ? [
+            'enabled' => $shop->enabled, 'live' => $shop->isLive(), 'urls' => $shop->urls(),
+            'unlisted_at' => $shop->unlisted_at, 'unlisted_reason' => $shop->unlisted_reason,
+        ] : null]);
+    }
+
+    /** Moderation: take a shop off shop.zinnvy.com (or put it back). The owner sees the reason in Settings. */
+    public function moderateShop(Request $request, Tenant $tenant)
+    {
+        $data = $request->validate(['unlisted' => 'required|boolean', 'reason' => 'required_if:unlisted,true|nullable|string|max:200']);
+        $shop = \App\Models\Shop::where('tenant_id', $tenant->id)->firstOrFail();
+        $shop->forceFill([
+            'unlisted_at' => $data['unlisted'] ? now() : null,
+            'unlisted_reason' => $data['unlisted'] ? $data['reason'] : null,
+        ])->save();
+
+        return response()->json(['unlisted_at' => $shop->unlisted_at, 'unlisted_reason' => $shop->unlisted_reason, 'live' => $shop->isLive()]);
     }
 
     public function update(Request $request, Tenant $tenant)

@@ -42,6 +42,19 @@ return [
     'frontend_url' => env('FRONTEND_URL'),
 
     // SMS provider (read through config so it keeps working when config is cached).
+    // Online shop (shop.zinnvy.com, or test-shop.zinnvy.com on staging).
+    'shop' => [
+        'url' => env('SHOP_URL', 'https://shop.zinnvy.com'),
+        // Where "Report this shop" lands.
+        'report_emails' => array_filter(explode(',', env('SHOP_REPORT_EMAILS', 'yawsonandrews@gmail.com'))),
+    ],
+
+    // Cloudflare Turnstile on the shop's order form. Off until both keys are set.
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET'),
+    ],
+
     'sms' => [
         'base_url' => env('SMS_BASE_URL'),
         'app_id' => env('SMS_APP_ID'),
