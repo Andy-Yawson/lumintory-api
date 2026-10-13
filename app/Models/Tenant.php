@@ -24,6 +24,29 @@ class Tenant extends Model
         'settings' => 'array', // Cast JSON to array for easy access
     ];
 
+    /** The Zinnvy green: used whenever a workspace hasn't picked its own colour. */
+    public const DEFAULT_BRAND_COLOR = '#1f5a45';
+
+    /**
+     * The workspace's own branding, applied across the app and on receipts.
+     * Not appended by default (signing the logo URL isn't free); call ->append('brand').
+     */
+    public function getBrandAttribute(): array
+    {
+        $settings = $this->settings ?? [];
+        $logo = $settings['logo_path'] ?? null;
+        $url = null;
+        if ($logo) {
+            $disk = \Illuminate\Support\Facades\Storage::disk('media');
+            $url = rescue(fn () => config('filesystems.disks.media.url') ? $disk->url($logo) : $disk->temporaryUrl($logo, now()->addDay()), null, report: false);
+        }
+
+        return [
+            'color' => $settings['brand_color'] ?? null,
+            'logo_url' => $url,
+        ];
+    }
+
     // Relationship: A tenant has many products, sales, etc. (We'll add later)
     public function products()
     {

@@ -15,6 +15,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ReadsSpreadsheet;
+
     public function index(Request $request)
     {
         $perPage = $request->get('per_page', 10);
@@ -333,22 +335,6 @@ class ProductController extends Controller
     }
 
     /** @return array{0: array<int,string>, 1: array<int, array<int,mixed>>} headers, data rows */
-    private function readSpreadsheet($file): array
-    {
-        $sheet = Excel::toArray(null, $file)[0] ?? [];
-        $headerRow = array_shift($sheet) ?? [];
-
-        $headers = [];
-        foreach ($headerRow as $i => $h) {
-            $h = trim((string) $h);
-            $headers[] = $h !== '' ? $h : 'Column ' . ($i + 1);
-        }
-
-        $rows = array_values(array_filter($sheet, fn ($r) => collect($r)->contains(fn ($v) => $v !== null && trim((string) $v) !== '')));
-
-        return [$headers, $rows];
-    }
-
     public function addStock(Request $request, $id)
     {
         $product = Product::findOrFail($id);
