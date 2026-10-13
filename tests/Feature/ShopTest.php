@@ -260,4 +260,25 @@ class ShopTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->getJson('/api/v1/public/shops/earles-closet')->assertNotFound();
     }
+
+    public function test_campaign_source_is_kept_on_the_order(): void
+    {
+        $p = $this->product('Bag');
+        $this->order([['product_id' => $p->id, 'quantity' => 1]], ['source' => ['utm_source' => 'instagram', 'utm_medium' => 'social', 'utm_campaign' => 'eid-sale', 'evil' => 'x']])->assertCreated();
+
+        $order = ShopOrder::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame(['utm_source' => 'instagram', 'utm_medium' => 'social', 'utm_campaign' => 'eid-sale'], $order->source);
+        $this->assertSame('instagram / social (eid-sale)', ShopOrderService::sourceLabel($order->source));
+    }
+
+    public function test_feed_lists_full_products_for_one_shop_or_the_marketplace(): void
+    {
+        $this->product('Silk Dress', 3, 250);
+        $this->product('Hidden', visible: false);
+
+        $this->getJson('/api/v1/public/feed?shop=earles-closet')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.shop.currency', 'GHS');
+        $this->getJson('/api/v1/public/feed')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/public/feed?shop=nope')->assertNotFound();
+    }
 }

@@ -98,6 +98,7 @@ class ShopOrderService
                 'fulfilment' => $data['fulfilment'],
                 'address' => $data['fulfilment'] === 'delivery' ? trim((string) ($data['address'] ?? '')) : null,
                 'note' => isset($data['note']) ? trim($data['note']) ?: null : null,
+                'source' => self::cleanSource($data['source'] ?? null),
                 'subtotal' => array_sum(array_column($lines, 'line_total')),
                 'item_count' => (int) ceil(array_sum(array_column($lines, 'quantity'))),
                 'ip_hash' => $ip ? hash('sha256', $ip.config('app.key')) : null,
@@ -130,6 +131,7 @@ class ShopOrderService
                 .($order->customer_email ? "Email: {$order->customer_email}\n" : '')
                 .'Fulfilment: '.ucfirst($order->fulfilment).($order->address ? " to {$order->address}" : '')."\n"
                 .($order->note ? "Note: {$order->note}\n" : '')
+                .(self::sourceLabel($order->source) ? 'Came from: '.self::sourceLabel($order->source)."\n" : '')
                 ."\n{$items}\n\nTotal: ".$money($order->subtotal)."\n\n"
                 ."Chat on WhatsApp: {$wa}\nOpen the order: {$dashboard}\n\n"
                 ."No payment has been taken. Contact the customer to confirm.\n\nZinnvy.";
@@ -230,6 +232,33 @@ class ShopOrderService
         }
 
         return strlen($d) === 10 && $d[0] === '0' ? $d : '+'.$d;
+    }
+
+    /** Keep only the attribution keys we know, trimmed. */
+    public static function cleanSource(?array $source): ?array
+    {
+        $keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'referrer', 'landing', 'fbclid', 'gclid', 'ttclid'];
+        $clean = array_filter(array_map(fn ($v) => is_string($v) ? mb_substr(trim($v), 0, 200) : null, array_intersect_key($source ?? [], array_flip($keys))));
+
+        return $clean ?: null;
+    }
+
+    /** "instagram / social (eid-sale)" or the referring site, for people. */
+    public static function sourceLabel(?array $s): ?string
+    {
+        if (! $s) {
+            return null;
+        }
+        if (! empty($s['utm_source'])) {
+            return $s['utm_source'].(! empty($s['utm_medium']) ? " / {$s['utm_medium']}" : '').(! empty($s['utm_campaign']) ? " ({$s['utm_campaign']})" : '');
+        }
+        foreach (['fbclid' => 'Facebook/Instagram ad', 'gclid' => 'Google ad', 'ttclid' => 'TikTok ad'] as $k => $label) {
+            if (! empty($s[$k])) {
+                return $label;
+            }
+        }
+
+        return ! empty($s['referrer']) ? parse_url($s['referrer'], PHP_URL_HOST) ?: null : null;
     }
 
     public static function phoneLooksValid(string $phone): bool

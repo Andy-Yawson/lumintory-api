@@ -80,6 +80,9 @@ class PublicShopController extends Controller
             'items.*.variation_id' => 'nullable|integer',
             'items.*.quantity' => 'required|numeric|min:1|max:999',
             'turnstile_token' => 'nullable|string',
+            // Campaign attribution captured on the landing page (utm_*, referrer, click ids).
+            'source' => 'nullable|array',
+            'source.*' => 'nullable|string|max:200',
         ], [
             'consent.accepted' => 'Please agree to share your details with the shop.',
             'address.required_if' => 'Add a delivery address.',
@@ -187,6 +190,34 @@ class PublicShopController extends Controller
             'updated_at' => $s->updated_at?->toIso8601String(),
             'products' => \App\Models\Product::withoutGlobalScopes()->where('tenant_id', $s->tenant_id)->where('shop_visible', true)->limit(2000)->pluck('id'),
         ])]);
+    }
+
+    /**
+     * Product feed (Google Merchant / Meta catalogue). One shop with ?shop=ref, otherwise the whole marketplace.
+     * Full product data, capped so a feed stays a reasonable size.
+     */
+    public function feed(Request $request)
+    {
+        $ref = $request->query('shop');
+        $shops = $ref
+            ? collect([Shop::findByRef($ref)])->filter(fn ($s) => $s && $s->isLive())
+            : Shop::live()->where('in_marketplace', true)->with('tenant')->get();
+        abort_if($ref && $shops->isEmpty(), 404, 'Shop not found.');
+
+        $byTenant = $shops->keyBy('tenant_id');
+        $products = $this->catalog->withRelations(
+            \App\Models\Product::withoutGlobalScopes()->where('shop_visible', true)->whereIn('tenant_id', $byTenant->keys())
+        )->latest('updated_at')->limit($ref ? 2000 : 5000)->get();
+
+        return response()->json(['data' => $products->map(function ($p) use ($byTenant) {
+            $shop = $byTenant[$p->tenant_id];
+            $t = $shop->tenant;
+
+            return $this->catalog->productPayload($p, full: true, shopInfo: [
+                'id' => $shop->public_id, 'slug' => $shop->slug, 'name' => $t->name,
+                'currency' => $t->settings['currency'] ?? 'GHS', 'currency_symbol' => $t->settings['currency_symbol'] ?? 'GH₵',
+            ]);
+        })]);
     }
 
     public function config()

@@ -78,6 +78,7 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
     Route::get('marketplace/shops', [PublicShopController::class, 'marketplaceShops']);
     Route::get('marketplace/categories', [PublicShopController::class, 'marketplaceCategories']);
     Route::get('sitemap', [PublicShopController::class, 'sitemap']);
+    Route::get('feed', [PublicShopController::class, 'feed']);
     Route::get('shops/{ref}', [PublicShopController::class, 'shop']);
     Route::get('shops/{ref}/products', [PublicShopController::class, 'products']);
     Route::get('shops/{ref}/products/{id}', [PublicShopController::class, 'product'])->whereNumber('id');

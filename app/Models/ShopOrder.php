@@ -15,6 +15,7 @@ class ShopOrder extends Model
 
     protected $casts = [
         'sale_ids' => 'array',
+        'source' => 'array',
         'subtotal' => 'decimal:2',
         'contacted_at' => 'datetime',
         'completed_at' => 'datetime',
