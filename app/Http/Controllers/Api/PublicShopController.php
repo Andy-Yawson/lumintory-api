@@ -101,6 +101,7 @@ class PublicShopController extends Controller
             'subtotal' => (float) $order->subtotal,
             'shop' => $shop->tenant->name,
             'phone' => $order->customer_phone,
+            'momo' => $shop->momo(),
         ], 201);
     }
 

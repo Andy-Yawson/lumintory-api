@@ -38,6 +38,7 @@ class ShopController extends Controller
         return $shop->only([
             'public_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp', 'notify_phone',
             'hours', 'pickup', 'delivery', 'delivery_note', 'blocked_phones',
+            'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
         ]) + [
             'banner_url' => $shop->bannerUrl(),
             'urls' => $shop->urls(),
@@ -74,7 +75,13 @@ class ShopController extends Controller
             'pickup' => 'sometimes|boolean',
             'delivery' => 'sometimes|boolean',
             'delivery_note' => 'sometimes|nullable|string|max:200',
+            'momo_network' => ['sometimes', 'nullable', Rule::in(Shop::MOMO_NETWORKS)],
+            'momo_number' => ['sometimes', 'nullable', 'string', 'max:20', 'regex:/^[+\d\s-]{9,20}$/'],
+            'momo_name' => 'sometimes|nullable|string|max:80',
+            'momo_merchant_id' => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]+$/'],
         ], [
+            'momo_number.regex' => 'Enter a valid Mobile Money number, e.g. 024 123 4567.',
+            'momo_merchant_id.regex' => 'Merchant IDs use letters and numbers only.',
             'slug.regex' => 'Use lowercase letters, numbers and single dashes, e.g. earles-closet.',
             'slug.not_in' => 'That link is reserved. Try another.',
             'slug.unique' => 'Another shop already uses that link.',
@@ -89,6 +96,13 @@ class ShopController extends Controller
             return response()->json(['message' => 'Offer pickup, delivery or both.', 'errors' => ['pickup' => ['Offer pickup, delivery or both.']]], 422);
         }
 
+        if (! empty($data['momo_number']) && empty($data['momo_network'] ?? $shop->momo_network)) {
+            return response()->json(['message' => 'Choose the Mobile Money network.', 'errors' => ['momo_network' => ['Choose the Mobile Money network.']]], 422);
+        }
+        if (isset($data['momo_number'])) {
+            $data['momo_number'] = ShopOrderService::normalisePhone($data['momo_number']);
+        }
+
         $shop->fill($data)->save();
 
         return response()->json($this->payload($shop->fresh()));
@@ -97,13 +111,14 @@ class ShopController extends Controller
     public function uploadBanner(Request $request)
     {
         $this->admin();
-        $request->validate(['banner' => 'required|file|mimes:png,jpg,jpeg,webp|max:5120']);
+        $request->validate(['banner' => 'required|file|mimes:png,jpg,jpeg,webp|max:15360']);
         $shop = $this->shop();
         $file = $request->file('banner');
-        $path = "tenants/{$shop->tenant_id}/shop/banner-".Str::uuid().'.'.$file->extension();
+        $optimized = \App\Services\ImageOptimizer::optimize($file->getContent(), 2400);
+        $path = "tenants/{$shop->tenant_id}/shop/banner-".Str::uuid().'.'.($optimized['ext'] ?? $file->extension());
 
         try {
-            Storage::disk('media')->put($path, $file->getContent(), ['ContentType' => $file->getMimeType()]);
+            Storage::disk('media')->put($path, $optimized['bytes'] ?? $file->getContent(), ['ContentType' => $optimized['mime'] ?? $file->getMimeType()]);
         } catch (\Throwable $e) {
             report($e);
 

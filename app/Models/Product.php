@@ -56,6 +56,11 @@ class Product extends Model
 
     // === RELATIONSHIPS ===
     /** Photos, primary first. */
+    public function videos()
+    {
+        return $this->hasMany(ProductVideo::class)->orderBy('id');
+    }
+
     public function images()
     {
         return $this->hasMany(ProductImage::class)->orderBy('position')->orderBy('id');

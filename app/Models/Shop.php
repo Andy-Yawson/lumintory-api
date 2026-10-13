@@ -23,6 +23,7 @@ class Shop extends Model
     protected $fillable = [
         'tenant_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp',
         'notify_phone', 'hours', 'pickup', 'delivery', 'delivery_note',
+        'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
     ];
 
     protected $casts = [
@@ -110,6 +111,26 @@ class Shop extends Model
         $last9 = substr(preg_replace('/\D/', '', $phone), -9);
 
         return collect($this->blocked_phones ?? [])->contains(fn ($p) => substr(preg_replace('/\D/', '', $p), -9) === $last9);
+    }
+
+    public const MOMO_NETWORKS = ['MTN', 'Telecel', 'AirtelTigo'];
+
+    /**
+     * Mobile Money details for paying this shop, or null if not set up. Shown to a customer only
+     * after they place an order (not on public pages), always with "pay after the shop confirms".
+     */
+    public function momo(): ?array
+    {
+        if (! $this->momo_number && ! $this->momo_merchant_id) {
+            return null;
+        }
+
+        return array_filter([
+            'network' => $this->momo_network,
+            'number' => $this->momo_number,
+            'name' => $this->momo_name,
+            'merchant_id' => $this->momo_merchant_id,
+        ]);
     }
 
     public function bannerUrl(): ?string

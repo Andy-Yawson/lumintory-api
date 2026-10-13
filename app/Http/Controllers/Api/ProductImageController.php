@@ -20,7 +20,8 @@ class ProductImageController extends Controller
     {
         $this->authorizeProduct($product);
         $request->validate([
-            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:min_width=100,min_height=100,max_width=8000,max_height=8000'],
+            // Up to 15 MB in: every photo is shrunk (max 2000px JPEG, metadata stripped) before storage.
+            'image' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:15360', 'dimensions:min_width=100,min_height=100,max_width=12000,max_height=12000'],
         ]);
 
         if ($product->images()->count() >= self::MAX_IMAGES) {
@@ -28,10 +29,11 @@ class ProductImageController extends Controller
         }
 
         $file = $request->file('image');
-        $path = "tenants/{$product->tenant_id}/products/{$product->id}/".Str::uuid().'.'.$file->extension();
+        $optimized = \App\Services\ImageOptimizer::optimize($file->getContent(), 2000);
+        $path = "tenants/{$product->tenant_id}/products/{$product->id}/".Str::uuid().'.'.($optimized['ext'] ?? $file->extension());
 
         try {
-            Storage::disk('media')->put($path, $file->getContent(), ['ContentType' => $file->getMimeType()]);
+            Storage::disk('media')->put($path, $optimized['bytes'] ?? $file->getContent(), ['ContentType' => $optimized['mime'] ?? $file->getMimeType()]);
         } catch (\Throwable $e) {
             report($e);
 

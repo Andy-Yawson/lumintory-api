@@ -140,17 +140,24 @@ class ShopOrderService
         }, report: true);
 
         $sms = app(SmsService::class);
-        if ($shop->notify_phone) {
-            rescue(fn () => $sms->queueSms($tenant->id, 'Zinnvy', $shop->notify_phone,
+        // Order alerts go to the "send order alerts to" number, or the shop's WhatsApp number if that's empty.
+        $alertPhone = $shop->notify_phone ?: $shop->whatsapp;
+        if ($alertPhone) {
+            rescue(fn () => $sms->queueSms($tenant->id, 'Zinnvy', $alertPhone,
                 "New shop order #{$order->number}: {$order->customer_name} {$order->customer_phone}, ".$money($order->subtotal).". Open Zinnvy Inventory > Orders."), report: true);
         }
+        $momo = $shop->momo();
+        $payLine = $momo ? self::momoLine($momo, $order->number) : null;
         rescue(fn () => $sms->queueSms($tenant->id, 'Zinnvy', $order->customer_phone,
-            "Thanks {$order->customer_name}! {$tenant->name} received your order #{$order->number} (".$money($order->subtotal)."). They'll contact you to confirm."), report: true);
+            "Thanks {$order->customer_name}! {$tenant->name} received your order #{$order->number} (".$money($order->subtotal)."). They'll contact you to confirm."
+            .($payLine ? " After they confirm, pay by {$payLine}" : '')), report: true);
         if ($order->customer_email) {
             rescue(fn () => MailHelper::sendEmailNotification($order->customer_email, "Your order #{$order->number} at {$tenant->name}",
                 "Hi {$order->customer_name},\n\n{$tenant->name} received your order #{$order->number}:\n\n{$items}\n\nTotal: ".$money($order->subtotal)
                 ."\n\nNo payment has been taken. {$tenant->name} will contact you on {$order->customer_phone} to confirm the order and arrange "
-                .($order->fulfilment === 'delivery' ? 'delivery' : 'pickup').".\n\nPowered by Zinnvy."), report: true);
+                .($order->fulfilment === 'delivery' ? 'delivery' : 'pickup').'.'
+                .($payLine ? "\n\nOnce they confirm, you can pay by {$payLine}\nOnly pay after {$tenant->name} has confirmed your order." : '')
+                ."\n\nPowered by Zinnvy."), report: true);
         }
     }
 
@@ -232,6 +239,19 @@ class ShopOrderService
         }
 
         return strlen($d) === 10 && $d[0] === '0' ? $d : '+'.$d;
+    }
+
+    /** "MTN MoMo 0241234567 (Ama Mensah), reference #1042." */
+    public static function momoLine(array $momo, int $orderNumber): string
+    {
+        $how = ! empty($momo['number'])
+            ? trim(($momo['network'] ?? '').' MoMo '.$momo['number'].(! empty($momo['name']) ? " ({$momo['name']})" : ''))
+            : trim(($momo['network'] ?? '').' MoMoPay merchant '.$momo['merchant_id']);
+        if (! empty($momo['number']) && ! empty($momo['merchant_id'])) {
+            $how .= ", or merchant ID {$momo['merchant_id']}";
+        }
+
+        return "{$how}, reference #{$orderNumber}.";
     }
 
     /** Keep only the attribution keys we know, trimmed. */

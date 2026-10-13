@@ -65,7 +65,7 @@ class BrandTest extends TestCase
     {
         $svg = UploadedFile::fake()->createWithContent('x.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
         $this->post('/api/v1/tenant/brand/logo', ['logo' => $svg], ['Accept' => 'application/json'])->assertStatus(422);
-        $this->post('/api/v1/tenant/brand/logo', ['logo' => UploadedFile::fake()->image('big.png')->size(3000)], ['Accept' => 'application/json'])->assertStatus(422);
+        $this->post('/api/v1/tenant/brand/logo', ['logo' => UploadedFile::fake()->image('big.png')->size(11000)], ['Accept' => 'application/json'])->assertStatus(422);
     }
 
     public function test_sales_users_cannot_change_the_brand(): void
