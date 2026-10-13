@@ -147,4 +147,11 @@ class Product extends Model
             $this->update(['quantity' => $total]);
         }
     }
+
+    /** Public shop pages show this model: refresh the shop site's cache when it changes. */
+    protected static function booted(): void
+    {
+        static::saved(fn () => \App\Services\Shop\ShopCache::bust());
+        static::deleted(fn () => \App\Services\Shop\ShopCache::bust());
+    }
 }

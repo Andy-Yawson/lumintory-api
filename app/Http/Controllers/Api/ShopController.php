@@ -149,6 +149,7 @@ class ShopController extends Controller
             $q->whereIn('id', $data['ids'] ?? []);
         }
         $changed = $q->update(['shop_visible' => $data['visible']]);
+        \App\Services\Shop\ShopCache::bust(); // mass update fires no model events
 
         return response()->json(['changed' => $changed] + $this->payload($this->shop()));
     }

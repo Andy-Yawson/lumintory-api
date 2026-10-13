@@ -46,6 +46,8 @@ return [
     'shop' => [
         'url' => env('SHOP_URL', 'https://shop.zinnvy.com'),
         // Where "Report this shop" lands.
+        // Shared with the shop site so it accepts our "refresh your cache" pings.
+        'revalidate_secret' => env('SHOP_REVALIDATE_SECRET'),
         'report_emails' => array_filter(explode(',', env('SHOP_REPORT_EMAILS', 'yawsonandrews@gmail.com'))),
     ],
 

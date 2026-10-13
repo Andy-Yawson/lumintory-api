@@ -36,6 +36,8 @@ class Shop extends Model
 
     protected static function booted(): void
     {
+        static::saved(fn () => \App\Services\Shop\ShopCache::bust());
+        static::deleted(fn () => \App\Services\Shop\ShopCache::bust());
         static::creating(function (Shop $shop) {
             $shop->public_id ??= self::newPublicId();
         });
