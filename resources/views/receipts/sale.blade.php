@@ -6,7 +6,6 @@
     $qty = rtrim(rtrim(number_format((float) $sale->quantity, 3, '.', ''), '0'), '.');
     $gross = (float) $sale->quantity * (float) $sale->unit_price;
     $discount = (float) ($sale->discount ?? 0);
-    $contact = $sale->tenant->users()->where('role', 'Administrator')->value('email');
     $initial = mb_strtoupper(mb_substr(trim($sale->tenant->name), 0, 1));
 @endphp
 <!DOCTYPE html>
@@ -84,11 +83,6 @@
 
         <div class="paid">✓ Paid</div>
         <div class="note">{{ $sale->notes ?: 'Thank you for your purchase!' }}</div>
-
-        <div class="footer">
-            @if($contact)Questions about this receipt? {{ $contact }}<br>@endif
-            Powered by <b>Zinnvy Inventory</b>
-        </div>
     </div>
 </body>
 </html>
