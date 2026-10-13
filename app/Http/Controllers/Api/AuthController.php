@@ -62,7 +62,10 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        return $request->user()->load('tenant');
+        $user = $request->user()->load('tenant');
+        $user->tenant?->append('brand');
+
+        return $user;
     }
 
     /**

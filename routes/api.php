@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\StoreConnectionController;
 use App\Http\Controllers\Api\StoreWebhookController;
 use App\Http\Controllers\Api\TenantSettingsController;
 use App\Http\Controllers\Api\OnboardingController;
+use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\SaleImportController;
 use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\Api\ZinnvyAiController;
@@ -80,6 +81,10 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::post('activate-subscription', [AuthController::class, 'activateSubscription']);
     Route::get('/tenant/settings', [TenantSettingsController::class, 'show']);
     Route::post('/tenant/settings', [TenantSettingsController::class, 'update']);
+    Route::get('/tenant/brand', [BrandController::class, 'show']);
+    Route::post('/tenant/brand', [BrandController::class, 'update']);
+    Route::post('/tenant/brand/logo', [BrandController::class, 'uploadLogo']);
+    Route::delete('/tenant/brand/logo', [BrandController::class, 'removeLogo']);
     Route::get('/onboarding', [OnboardingController::class, 'show']);
     Route::post('/onboarding/dismiss', [OnboardingController::class, 'dismiss']);
 
