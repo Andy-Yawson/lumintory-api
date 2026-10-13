@@ -20,7 +20,7 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
 
-        $query = Product::with(['category', 'variations'])->where('tenant_id', Auth::user()->tenant_id);
+        $query = Product::with(['category', 'variations', 'images'])->where('tenant_id', Auth::user()->tenant_id);
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
@@ -109,7 +109,9 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        return $product;
+        $this->authorizeProduct($product);
+
+        return $product->load(['category', 'variations', 'images']);
     }
 
     /**
@@ -219,7 +221,11 @@ class ProductController extends Controller
     public function destroy(Product $product)
     {
         $this->authorizeProduct($product);
+        $paths = $product->images()->pluck('path')->all();
         $product->delete();
+        if ($paths) {
+            rescue(fn () => \Illuminate\Support\Facades\Storage::disk('media')->delete($paths), report: true);
+        }
         return response()->json(null, 204);
     }
 

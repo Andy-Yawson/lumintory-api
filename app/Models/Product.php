@@ -53,6 +53,12 @@ class Product extends Model
     }
 
     // === RELATIONSHIPS ===
+    /** Photos, primary first. */
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('position')->orderBy('id');
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

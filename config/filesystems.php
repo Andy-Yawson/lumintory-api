@@ -44,6 +44,23 @@ return [
             'throw' => false,
         ],
 
+        // Product images (Cloudflare R2, S3-compatible). Files live under MEDIA_ROOT
+        // (staging|production) in the bucket. Set MEDIA_PUBLIC_URL once the bucket has a public
+        // domain (needed for a public storefront); until then images are served by signed URLs.
+        'media' => [
+            'driver' => env('MEDIA_DRIVER', 's3'),
+            'key' => env('MEDIA_ACCESS_KEY_ID'),
+            'secret' => env('MEDIA_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('MEDIA_BUCKET', 'zinnvy-inventory'),
+            'endpoint' => env('MEDIA_ENDPOINT'),
+            'url' => env('MEDIA_PUBLIC_URL'),
+            'root' => env('MEDIA_ROOT', 'staging'),
+            'use_path_style_endpoint' => true,
+            'visibility' => 'private',
+            'throw' => true,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
