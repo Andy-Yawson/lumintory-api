@@ -310,4 +310,15 @@ class ShopTest extends TestCase
         $this->order([['product_id' => $p->id, 'quantity' => 1]])->assertCreated();
         $this->assertTrue(SmsLog::where('recipient', '233207778888')->where('message', 'like', 'New shop order%')->exists());
     }
+
+    public function test_banner_framing_is_saved_validated_and_public(): void
+    {
+        Sanctum::actingAs($this->admin);
+        $this->putJson('/api/v1/shop', ['banner_focus_x' => 30, 'banner_focus_y' => 70, 'banner_zoom' => 140])->assertOk()
+            ->assertJsonPath('banner_framing', ['x' => 30, 'y' => 70, 'zoom' => 140]);
+        $this->putJson('/api/v1/shop', ['banner_zoom' => 50])->assertStatus(422);
+        $this->putJson('/api/v1/shop', ['banner_focus_x' => 120])->assertStatus(422);
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/v1/public/shops/earles-closet')->assertJsonPath('banner_framing.zoom', 140);
+    }
 }

@@ -85,6 +85,13 @@ class ProcessProductVideo implements ShouldQueue, NotTenantAware
             }
             rescue(fn () => $disk->delete($video->source_path), report: false);
 
+            // Cancelled while we were converting: don't leave the new files behind.
+            if (! ProductVideo::whereKey($video->id)->exists()) {
+                rescue(fn () => $disk->delete(["{$base}.mp4", "{$base}.jpg"]), report: false);
+
+                return;
+            }
+
             $video->update([
                 'status' => 'ready',
                 'path' => "{$base}.mp4",

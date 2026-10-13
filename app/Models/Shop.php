@@ -24,6 +24,7 @@ class Shop extends Model
         'tenant_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp',
         'notify_phone', 'hours', 'pickup', 'delivery', 'delivery_note',
         'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
+        'banner_focus_x', 'banner_focus_y', 'banner_zoom',
     ];
 
     protected $casts = [
@@ -131,6 +132,12 @@ class Shop extends Model
             'name' => $this->momo_name,
             'merchant_id' => $this->momo_merchant_id,
         ]);
+    }
+
+    /** How to frame the banner: focus point in % and zoom in % (100 = fit). */
+    public function bannerFraming(): array
+    {
+        return ['x' => (int) ($this->banner_focus_x ?? 50), 'y' => (int) ($this->banner_focus_y ?? 50), 'zoom' => (int) ($this->banner_zoom ?? 100)];
     }
 
     public function bannerUrl(): ?string
