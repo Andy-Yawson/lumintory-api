@@ -11,13 +11,16 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Spatie\Multitenancy\Jobs\NotTenantAware;
 
 /**
  * Turns whatever a phone recorded (MOV/HEVC, huge bitrates, any orientation) into a small
  * MP4 that plays in every browser: H.264/AAC, at most 720px wide (portrait stays portrait),
  * first 30 seconds, "faststart" so it begins playing before it's fully downloaded. Plus a poster frame.
  */
-class ProcessProductVideo implements ShouldQueue
+// NotTenantAware: the job finds its workspace from the video row; without it the multitenancy
+// package silently drops the job ("current tenant could not be determined").
+class ProcessProductVideo implements ShouldQueue, NotTenantAware
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
