@@ -22,7 +22,7 @@ class ProductController extends Controller
         $perPage = $request->get('per_page', 10);
         $search = $request->get('search');
 
-        $query = Product::with(['category', 'variations', 'images'])->where('tenant_id', Auth::user()->tenant_id);
+        $query = Product::with(['category', 'variations', 'images', 'videos'])->where('tenant_id', Auth::user()->tenant_id);
 
         if ($search) {
             $query->where('name', 'like', "%{$search}%")
@@ -113,7 +113,7 @@ class ProductController extends Controller
     {
         $this->authorizeProduct($product);
 
-        return $product->load(['category', 'variations', 'images']);
+        return $product->load(['category', 'variations', 'images', 'videos']);
     }
 
     /**
@@ -224,6 +224,7 @@ class ProductController extends Controller
     {
         $this->authorizeProduct($product);
         $paths = $product->images()->pluck('path')->all();
+        $product->videos()->get()->each->deleteFiles(); // rows go with the product (cascade), files don't
         $product->delete();
         if ($paths) {
             rescue(fn () => \Illuminate\Support\Facades\Storage::disk('media')->delete($paths), report: true);

@@ -38,7 +38,8 @@ return [
             'driver' => 'database',
             'table' => 'jobs',
             'queue' => 'default',
-            'retry_after' => 90,
+            // Longer than the slowest job (product video conversion, 180s), so it's never started twice.
+            'retry_after' => (int) env('QUEUE_RETRY_AFTER', 300),
             'after_commit' => false,
         ],
 

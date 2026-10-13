@@ -53,6 +53,7 @@ class ShopCatalog
     {
         return $q->with([
             'images' => fn ($i) => $i->withoutGlobalScopes()->orderBy('position'),
+            'videos' => fn ($v) => $v->where('status', 'ready'),
             'variations' => fn ($v) => $v->withoutGlobalScopes()->orderBy('id'),
             'category' => fn ($c) => $c->withoutGlobalScopes()->select('id', 'name'),
         ]);
@@ -69,6 +70,9 @@ class ShopCatalog
         $prices = $variations->isNotEmpty() ? $variations->pluck('price') : collect([(float) $p->unit_price]);
         $stock = $variations->isNotEmpty() ? (float) $p->variations->sum('quantity') : (float) $p->quantity;
         $images = $p->images->map(fn ($i) => $i->url)->filter()->values();
+        $videos = $p->relationLoaded('videos') ? $p->videos->filter(fn ($v) => $v->url)->map(fn ($v) => [
+            'url' => $v->url, 'poster' => $v->poster_url, 'duration' => $v->duration, 'width' => $v->width, 'height' => $v->height,
+        ])->values() : collect();
 
         return array_filter([
             'id' => $p->id,
@@ -77,8 +81,11 @@ class ShopCatalog
             'category' => $p->category?->name,
             'price' => $prices->min(),
             'price_max' => $prices->max() > $prices->min() ? $prices->max() : null,
-            'image' => $images->first(),
             'images' => $full ? $images : null,
+            'videos' => $full && $videos->isNotEmpty() ? $videos : null,
+            'has_video' => $videos->isNotEmpty() ?: null,
+            // No photo yet but a video: use its poster as the tile image.
+            'image' => $images->first() ?? $videos->first()['poster'] ?? null,
             'description' => $full ? $p->description : null,
             'variations' => $full || $variations->isNotEmpty() ? $variations : null,
             'shop' => $shopInfo,
