@@ -89,6 +89,9 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::post('products/import/dry-run', [ProductController::class, 'importDryRun']);
     Route::post('products/import', [ProductController::class, 'import']);
     Route::post('products/{id}/add-stock', [ProductController::class, 'addStock']);
+    Route::post('products/{product}/images', [\App\Http\Controllers\Api\ProductImageController::class, 'store'])->middleware('throttle:60,1');
+    Route::delete('products/{product}/images/{image}', [\App\Http\Controllers\Api\ProductImageController::class, 'destroy']);
+    Route::post('products/{product}/images/{image}/primary', [\App\Http\Controllers\Api\ProductImageController::class, 'primary']);
 
     Route::apiResource('categories', CategoryController::class);
 
