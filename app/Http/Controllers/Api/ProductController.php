@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Exports\ProductTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\ProductOptions;
 use App\Models\ProductVariation;
 use App\Services\PlanLimit;
 use App\Services\ProductImportService;
@@ -59,16 +60,17 @@ class ProductController extends Controller
             'category_id' => 'nullable|exists:categories,id',
 
             // An empty list means "no variations" (a simple product).
-            'variations' => 'nullable|array',
-            'variations.*.name' => 'required|string',
+            'variations' => 'nullable|array|max:'.ProductOptions::MAX_VARIATIONS,
+            'variations.*.name' => 'required_without:option_names|nullable|string|max:150', // built from the options when they're used
             'variations.*.quantity' => 'required|numeric|min:0',
             'variations.*.unit_price' => 'nullable|numeric',
             'variations.*.sku' => 'nullable|string',
-        ]);
+        ] + ProductOptions::rules());
 
+        [$optionNames, $data['variations']] = ProductOptions::normalise($data['option_names'] ?? null, $data['variations'] ?? []);
         $tenantId = Auth::user()->tenant_id;
 
-        return DB::transaction(function () use ($data, $tenantId) {
+        return DB::transaction(function () use ($data, $tenantId, $optionNames) {
 
             $hasVariations = !empty($data['variations']);
 
@@ -85,6 +87,7 @@ class ProductController extends Controller
                 'lead_time_days' => $data['lead_time_days'] ?? 7,
                 'min_stock_threshold' => $data['min_stock_threshold'] ?? 0,
                 'category_id' => $data['category_id'] ?? null,
+                'option_names' => $hasVariations ? $optionNames : null,
             ]);
 
             // 2. Create variations (if any)
@@ -92,6 +95,7 @@ class ProductController extends Controller
                 foreach ($data['variations'] as $variation) {
                     $product->variations()->create([
                         'name' => $variation['name'],
+                        'options' => $variation['options'] ?? null,
                         'quantity' => $variation['quantity'],
                         'unit_price' => $variation['unit_price'] ?? null,
                         'sku' => $variation['sku'] ?? null,
@@ -133,13 +137,20 @@ class ProductController extends Controller
             'min_stock_threshold' => 'nullable|integer',
             'category_id' => 'nullable|exists:categories,id',
 
-            'variations' => 'nullable|array',
+            'variations' => 'nullable|array|max:'.ProductOptions::MAX_VARIATIONS,
             'variations.*.id' => 'nullable|exists:product_variations,id',
-            'variations.*.name' => 'required|string',
+            'variations.*.name' => 'required_without:option_names|nullable|string|max:150', // built from the options when they're used
             'variations.*.quantity' => 'required|numeric|min:0',
             'variations.*.unit_price' => 'nullable|numeric',
             'variations.*.sku' => 'nullable|string',
-        ]);
+        ] + ProductOptions::rules());
+
+        if (array_key_exists('variations', $data) && is_array($data['variations'])) {
+            [$optionNames, $data['variations']] = ProductOptions::normalise($data['option_names'] ?? null, $data['variations']);
+            $data['option_names'] = $data['variations'] ? $optionNames : null;
+        } else {
+            unset($data['option_names']); // options only change together with the variations
+        }
 
         return DB::transaction(function () use ($product, $data) {
 
@@ -182,6 +193,7 @@ class ProductController extends Controller
                         if ($variation) {
                             $variation->fill([
                                 'name' => $variationData['name'],
+                                'options' => $variationData['options'] ?? null,
                                 'quantity' => (float) $variationData['quantity'], // Cast to float explicitly
                                 'unit_price' => $variationData['unit_price'] ?? null,
                                 'sku' => $variationData['sku'] ?? null,
@@ -193,6 +205,7 @@ class ProductController extends Controller
                     else {
                         $product->variations()->create([
                             'name' => $variationData['name'],
+                            'options' => $variationData['options'] ?? null,
                             'quantity' => (float) $variationData['quantity'],
                             'unit_price' => $variationData['unit_price'] ?? null,
                             'sku' => $variationData['sku'] ?? null,

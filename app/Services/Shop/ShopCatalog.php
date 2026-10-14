@@ -64,9 +64,12 @@ class ShopCatalog
 
     public function productPayload(Product $p, bool $full = false, ?array $shopInfo = null): array
     {
+        // Old products have one unnamed list of variations: present it as a single "Option".
+        $optionNames = $p->option_names ?: ($p->variations->isNotEmpty() ? ['Option'] : []);
         $variations = $p->variations->map(fn ($v) => [
             'id' => $v->id,
             'name' => $v->name,
+            'options' => $v->options ?: [$optionNames[0] ?? 'Option' => $v->name],
             'price' => (float) ($v->unit_price ?: $p->unit_price),
         ] + self::availability((float) $v->quantity))->values();
 
@@ -91,6 +94,11 @@ class ShopCatalog
             'image' => $images->first() ?? $videos->first()['poster'] ?? null,
             'description' => $full ? $p->description : null,
             'variations' => $full || $variations->isNotEmpty() ? $variations : null,
+            // [{name: "Colour", values: ["Brown", "Black"]}, {name: "Size", values: [...]}], values in the owner's order
+            'options' => $variations->isNotEmpty() ? collect($optionNames)->map(fn ($n) => [
+                'name' => $n,
+                'values' => $variations->pluck("options.{$n}")->filter(fn ($x) => $x !== null && $x !== '')->unique()->values(),
+            ])->values() : null,
             'shop' => $shopInfo,
         ] + self::availability($stock), fn ($v) => $v !== null);
     }

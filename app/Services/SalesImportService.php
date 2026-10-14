@@ -187,7 +187,9 @@ class SalesImportService
             $product = $bySku->get($key) ?? $byName->get($key);
             $variation = null;
             if ($product && $variationText !== '') {
-                $variation = ($variations->get($product->id) ?? collect())->first(fn ($v) => mb_strtolower(trim($v->name)) === mb_strtolower($variationText));
+                // "Brown/42", "brown / 42" and "Brown / 42" are the same option combination.
+                $vkey = fn ($t) => preg_replace('/\s*\/\s*/', '/', preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $t))));
+                $variation = ($variations->get($product->id) ?? collect())->first(fn ($v) => $vkey($v->name) === $vkey($variationText));
             }
 
             // Price: given, else from the line total, else the product's own price.
