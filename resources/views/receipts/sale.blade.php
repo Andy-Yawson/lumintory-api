@@ -93,7 +93,7 @@
         <table class="items">
             <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
             <tbody><tr>
-                <td><div class="item">{{ $sale->product?->name ?? 'Item' }}</div>@if($sale->variation)<div class="sub">{{ $sale->variation->name }}</div>@endif</td>
+                <td><div class="item">{{ $sale->product?->name ?? 'Item' }}</div>@if($sale->variation)<div class="sub">{{ $sale->variation->name }}</div>@elseif($sale->product?->size)<div class="sub">{{ $sale->product->size }}</div>@endif</td>
                 <td class="num">{{ $qty }}</td>
                 <td class="num">{{ $money($sale->unit_price) }}</td>
                 <td class="num">{{ $money($gross) }}</td>

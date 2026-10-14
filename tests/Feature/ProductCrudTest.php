@@ -89,4 +89,19 @@ class ProductCrudTest extends TestCase
 
         $this->assertSame('A1', ProductVariation::withoutGlobalScopes()->find($foreignId)->name);
     }
+
+    public function test_size_is_kept_for_simple_products_and_cleared_when_variations_take_over(): void
+    {
+        $this->actAsAdmin();
+        $id = $this->postJson('/api/v1/products', ['name' => 'Palm Oil', 'size' => '1L', 'unit_price' => 38, 'quantity' => 10])->json('id');
+        $this->assertSame('1L', Product::withoutGlobalScopes()->find($id)->size);
+
+        // The form turns the size into the first variation and sends size '' with the variations.
+        $this->putJson("/api/v1/products/{$id}", ['name' => 'Palm Oil', 'size' => '', 'unit_price' => 38,
+            'variations' => [['name' => '1L', 'quantity' => 10, 'unit_price' => 38], ['name' => '5L', 'quantity' => 2, 'unit_price' => 170]]])->assertOk();
+
+        $p = Product::withoutGlobalScopes()->find($id);
+        $this->assertEmpty($p->size);
+        $this->assertEquals(12, $p->quantity);
+    }
 }
