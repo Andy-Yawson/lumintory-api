@@ -321,4 +321,21 @@ class ShopTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->getJson('/api/v1/public/shops/earles-closet')->assertJsonPath('banner_framing.zoom', 140);
     }
+
+    public function test_shop_lists_options_with_values_in_order(): void
+    {
+        $p = $this->product('Sandals', 0, 150);
+        $p->forceFill(['option_names' => ['Colour', 'Size']])->save();
+        foreach ([['Brown', '41', 3], ['Brown', '42', 0], ['Black', '42', 2]] as [$c, $s, $q]) {
+            ProductVariation::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'product_id' => $p->id, 'name' => "{$c} / {$s}", 'options' => ['Colour' => $c, 'Size' => $s], 'quantity' => $q, 'unit_price' => 150]);
+        }
+        $json = $this->getJson("/api/v1/public/shops/earles-closet/products/{$p->id}")->assertOk()->json();
+        $this->assertSame([['name' => 'Colour', 'values' => ['Brown', 'Black']], ['name' => 'Size', 'values' => ['41', '42']]], $json['options']);
+        $this->assertSame(['Colour' => 'Brown', 'Size' => '42'], $json['variations'][1]['options']);
+        $this->assertSame('sold_out', $json['variations'][1]['availability']);
+
+        $old = $this->product('Cap', 0, 10);
+        ProductVariation::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'product_id' => $old->id, 'name' => 'Red', 'quantity' => 1, 'unit_price' => 10]);
+        $this->getJson("/api/v1/public/shops/earles-closet/products/{$old->id}")->assertJsonPath('options.0.name', 'Option')->assertJsonPath('variations.0.options.Option', 'Red');
+    }
 }

@@ -15,6 +15,7 @@ class ProductVariation extends Model
         'tenant_id',
         'product_id',
         'name',
+        'options',
         'sku',
         'quantity',
         'unit_price',
@@ -24,6 +25,7 @@ class ProductVariation extends Model
 
     protected $casts = [
         'quantity' => 'decimal:2',
+        'options' => 'array',
     ];
 
     protected static function boot()

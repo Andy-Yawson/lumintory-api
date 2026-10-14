@@ -140,4 +140,12 @@ class SalesImportTest extends TestCase
         $this->assertFalse(SalesImportService::detectDayFirst([['10/25/2026'], ['10/02/2026']], 0));
         $this->assertTrue(SalesImportService::detectDayFirst([['05/06/2026']], 0), 'ambiguous → day first');
     }
+
+    public function test_option_combinations_match_however_they_are_spaced(): void
+    {
+        $p = $this->product('Sandals', 0, 150);
+        $v = ProductVariation::withoutGlobalScopes()->create(['tenant_id' => $this->tenant->id, 'product_id' => $p->id, 'name' => 'Brown / 42', 'options' => ['Colour' => 'Brown', 'Size' => '42'], 'quantity' => 5, 'unit_price' => 150]);
+        $this->send('', [['Item', 'Variant', 'Qty'], ['Sandals', 'brown/42', '1']], ['product' => 0, 'variation' => 1, 'quantity' => 2])->assertOk()->assertJsonPath('imported', 1);
+        $this->assertSame($v->id, Sale::withoutGlobalScopes()->first()->variation_id);
+    }
 }

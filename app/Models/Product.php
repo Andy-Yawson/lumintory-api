@@ -26,7 +26,8 @@ class Product extends Model
         'sku',
         'lead_time_days',
         'min_stock_threshold',
-        'category_id'
+        'category_id',
+        'option_names',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Product extends Model
         'lead_time_days' => 'integer',
         // Listed on the online shop. Changed only through /shop/visibility, so not fillable.
         'shop_visible' => 'boolean',
+        'option_names' => 'array',
     ];
 
     protected $appends = [

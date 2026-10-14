@@ -104,4 +104,57 @@ class ProductCrudTest extends TestCase
         $this->assertEmpty($p->size);
         $this->assertEquals(12, $p->quantity);
     }
+
+    public function test_options_build_variation_names_and_round_trip(): void
+    {
+        $this->actAsAdmin();
+        $res = $this->postJson('/api/v1/products', [
+            'name' => 'Leather Sandals', 'unit_price' => 150, 'option_names' => ['Colour', 'Size'],
+            'variations' => [
+                ['options' => ['Colour' => 'Brown', 'Size' => '41'], 'quantity' => 3, 'unit_price' => 150],
+                ['options' => ['Colour' => 'Brown', 'Size' => '42'], 'quantity' => 5, 'unit_price' => 150],
+                ['options' => ['Colour' => 'Black', 'Size' => '42'], 'quantity' => 2, 'unit_price' => 155],
+            ],
+        ])->assertCreated();
+
+        $p = Product::withoutGlobalScopes()->find($res->json('id'));
+        $this->assertSame(['Colour', 'Size'], $p->option_names);
+        $this->assertEquals(10, $p->quantity);
+        $this->assertSame(['Brown / 41', 'Brown / 42', 'Black / 42'], $p->variations()->withoutGlobalScopes()->orderBy('id')->pluck('name')->all());
+        $this->assertSame(['Colour' => 'Black', 'Size' => '42'], $p->variations()->withoutGlobalScopes()->orderByDesc('id')->first()->options);
+
+        // Edit: drop "Brown / 41", rename nothing, add a Black 43.
+        $vars = $res->json('variations');
+        $this->putJson("/api/v1/products/{$p->id}", [
+            'name' => 'Leather Sandals', 'unit_price' => 150, 'option_names' => ['Colour', 'Size'],
+            'variations' => [
+                ['id' => $vars[1]['id'], 'options' => ['Colour' => 'Brown', 'Size' => '42'], 'quantity' => 4],
+                ['id' => $vars[2]['id'], 'options' => ['Colour' => 'Black', 'Size' => '42'], 'quantity' => 2],
+                ['options' => ['Colour' => 'Black', 'Size' => '43'], 'quantity' => 1],
+            ],
+        ])->assertOk();
+        $this->assertSame(['Brown / 42', 'Black / 42', 'Black / 43'], $p->variations()->withoutGlobalScopes()->orderBy('id')->pluck('name')->all());
+        $this->assertSame($vars[1]['id'], $p->variations()->withoutGlobalScopes()->orderBy('id')->first()->id, 'existing stock row kept, so sales history stays linked');
+    }
+
+    public function test_option_rules(): void
+    {
+        $this->actAsAdmin();
+        $base = ['name' => 'Rod', 'unit_price' => 10];
+        $this->postJson('/api/v1/products', $base + ['option_names' => ['Diameter', 'Length'], 'variations' => [['options' => ['Diameter' => '12mm'], 'quantity' => 1]]])
+            ->assertStatus(422)->assertJsonFragment(['Choose a Length for every row.']);
+        $this->postJson('/api/v1/products', $base + ['option_names' => ['Size'], 'variations' => [['options' => ['Size' => 'L'], 'quantity' => 1], ['options' => ['Size' => 'l'], 'quantity' => 1]]])
+            ->assertStatus(422);
+        $this->postJson('/api/v1/products', $base + ['option_names' => ['A', 'B', 'C', 'D'], 'variations' => []])->assertStatus(422);
+        $this->postJson('/api/v1/products', $base + ['option_names' => ['Colour', 'colour'], 'variations' => []])->assertStatus(422);
+    }
+
+    public function test_old_style_variations_still_work_without_option_names(): void
+    {
+        $this->actAsAdmin();
+        $id = $this->postJson('/api/v1/products', ['name' => 'Cap', 'unit_price' => 10, 'variations' => [['name' => 'Red', 'quantity' => 2]]])->assertCreated()->json('id');
+        $p = Product::withoutGlobalScopes()->find($id);
+        $this->assertNull($p->option_names);
+        $this->assertSame('Red', $p->variations()->withoutGlobalScopes()->first()->name);
+    }
 }
