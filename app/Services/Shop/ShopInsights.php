@@ -97,7 +97,7 @@ class ShopInsights
                 ['step' => 'Viewed a product', 'count' => $cur['product_viewers']],
                 ['step' => 'Added to cart', 'count' => $cur['carters']],
                 ['step' => 'Started checkout', 'count' => $cur['checkouts']],
-                ['step' => 'Placed an order', 'count' => $cur['orders']],
+                ['step' => 'Placed an order', 'count' => $cur['ordering_visitors']],
             ],
             'products' => $products,
             'sources' => $sources,
@@ -123,6 +123,8 @@ class ShopInsights
         $distinct = fn (string $type) => (int) $e()->where('type', $type)->distinct()->count('visitor_id');
         $visitors = (int) $e()->distinct()->count('visitor_id');
         $orders = (int) $this->orders($shop, $from, $to)->count();
+        // Funnel and conversion only count orders we can tie to a tracked visit (older orders can't be).
+        $orderingVisitors = (int) $this->orders($shop, $from, $to)->whereNotNull('visitor_id')->distinct()->count('visitor_id');
 
         return [
             'visitors' => $visitors,
@@ -135,7 +137,8 @@ class ShopInsights
             'order_value' => round((float) $this->orders($shop, $from, $to)->sum('subtotal'), 2),
             'shares' => (int) $e()->where('type', 'share')->count(),
             'chats' => (int) $e()->where('type', 'chat')->count(),
-            'conversion' => $visitors ? round($orders / $visitors * 100, 1) : 0.0,
+            'ordering_visitors' => $orderingVisitors,
+            'conversion' => $visitors ? round(min($orderingVisitors, $visitors) / $visitors * 100, 1) : 0.0,
         ];
     }
 
@@ -249,11 +252,11 @@ class ShopInsights
             $out[] = ['tone' => 'info', 'text' => 'Visitors searched for '.$missing->map(fn ($t) => "\"{$t}\"")->join(', ', ' and ').' and found nothing. Worth stocking or listing?'];
         }
 
-        if ($cur['carters'] >= 5 && $cur['orders'] <= $cur['carters'] * 0.2) {
-            $out[] = ['tone' => 'warn', 'text' => "{$cur['carters']} people added to cart but only {$cur['orders']} ordered. Make sure delivery options and your WhatsApp number are clear on your shop."];
+        if ($cur['carters'] >= 5 && $cur['ordering_visitors'] <= $cur['carters'] * 0.2) {
+            $out[] = ['tone' => 'warn', 'text' => "{$cur['carters']} people added to cart but only {$cur['ordering_visitors']} ordered. Make sure delivery options and your WhatsApp number are clear on your shop."];
         }
 
-        if ($cur['orders'] > 0 && $cur['conversion'] >= 2) {
+        if ($cur['ordering_visitors'] > 0 && $cur['conversion'] >= 2) {
             $out[] = ['tone' => 'good', 'text' => "{$cur['conversion']}% of visitors placed an order. That's a healthy rate for an online shop."];
         }
 

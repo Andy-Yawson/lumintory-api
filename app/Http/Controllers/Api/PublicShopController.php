@@ -83,6 +83,7 @@ class PublicShopController extends Controller
             // Campaign attribution captured on the landing page (utm_*, referrer, click ids).
             'source' => 'nullable|array',
             'source.*' => 'nullable|string|max:200',
+            'visitor' => 'nullable|string|max:40',
         ], [
             'consent.accepted' => 'Please agree to share your details with the shop.',
             'address.required_if' => 'Add a delivery address.',

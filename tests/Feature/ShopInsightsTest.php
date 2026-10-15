@@ -86,12 +86,17 @@ class ShopInsightsTest extends TestCase
         }
         $this->send(['visitor' => 'v-insta-1', 'source' => ['referrer' => 'https://instagram.com'], 'events' => [['type' => 'view'], ['type' => 'add_to_cart', 'product_id' => $this->dress->id], ['type' => 'checkout'], ['type' => 'search', 'search' => 'wedding dress', 'results' => 0]]]);
         ShopOrder::withoutGlobalScopes()->forceCreate(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'number' => 1001, 'customer_name' => 'A', 'customer_phone' => '0241234567',
-            'fulfilment' => 'pickup', 'subtotal' => 250, 'item_count' => 1, 'source' => ['utm_source' => 'instagram']]);
+            'fulfilment' => 'pickup', 'subtotal' => 250, 'item_count' => 1, 'source' => ['utm_source' => 'instagram'], 'visitor_id' => 'v-insta-1']);
+        // An older order with no visitor: counted in orders, not in the funnel or conversion.
+        ShopOrder::withoutGlobalScopes()->forceCreate(['tenant_id' => $this->tenant->id, 'shop_id' => $this->shop->id, 'number' => 1002, 'customer_name' => 'B', 'customer_phone' => '0241234568',
+            'fulfilment' => 'pickup', 'subtotal' => 100, 'item_count' => 1]);
 
         Sanctum::actingAs($this->admin);
         $r = $this->getJson('/api/v1/shop/insights?range=7d')->assertOk()->json();
 
         $this->assertSame(13, $r['totals']['visitors']);
+        $this->assertSame(2, $r['totals']['orders']);
+        $this->assertSame(7.7, $r['totals']['conversion'], '1 tracked ordering visitor of 13');
         $this->assertSame([13, 12, 1, 1, 1], array_column($r['funnel'], 'count'));
         $this->assertSame(['whatsapp', 12, 0], [$r['sources'][0]['source'], $r['sources'][0]['visitors'], $r['sources'][0]['orders']]);
         $this->assertSame(1, collect($r['sources'])->firstWhere('source', 'instagram')['orders']);
