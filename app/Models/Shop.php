@@ -25,6 +25,7 @@ class Shop extends Model
         'notify_phone', 'hours', 'pickup', 'delivery', 'delivery_note',
         'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
         'banner_focus_x', 'banner_focus_y', 'banner_zoom',
+        'meta_pixel_id', 'ga_measurement_id', 'tiktok_pixel_id',
     ];
 
     protected $casts = [

@@ -39,6 +39,7 @@ class ShopController extends Controller
             'public_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp', 'notify_phone',
             'hours', 'pickup', 'delivery', 'delivery_note', 'blocked_phones',
             'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
+            'meta_pixel_id', 'ga_measurement_id', 'tiktok_pixel_id',
         ]) + [
             'banner_url' => $shop->bannerUrl(),
             'banner_framing' => $shop->bannerFraming(),
@@ -76,6 +77,9 @@ class ShopController extends Controller
             'pickup' => 'sometimes|boolean',
             'delivery' => 'sometimes|boolean',
             'delivery_note' => 'sometimes|nullable|string|max:200',
+            'meta_pixel_id' => ['sometimes', 'nullable', 'regex:/^\d{8,20}$/'],
+            'ga_measurement_id' => ['sometimes', 'nullable', 'regex:/^G-[A-Z0-9]{4,20}$/i'],
+            'tiktok_pixel_id' => ['sometimes', 'nullable', 'regex:/^[A-Z0-9]{8,40}$/i'],
             'banner_focus_x' => 'sometimes|integer|between:0,100',
             'banner_focus_y' => 'sometimes|integer|between:0,100',
             'banner_zoom' => 'sometimes|integer|between:100,300',
@@ -85,6 +89,9 @@ class ShopController extends Controller
             'momo_merchant_id' => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^[A-Za-z0-9-]+$/'],
         ], [
             'momo_number.regex' => 'Enter a valid Mobile Money number, e.g. 024 123 4567.',
+            'meta_pixel_id.regex' => 'A Meta Pixel ID is a number, e.g. 1234567890123456.',
+            'ga_measurement_id.regex' => 'A Google Analytics ID looks like G-XXXXXXX.',
+            'tiktok_pixel_id.regex' => 'A TikTok Pixel ID is letters and numbers.',
             'momo_merchant_id.regex' => 'Merchant IDs use letters and numbers only.',
             'slug.regex' => 'Use lowercase letters, numbers and single dashes, e.g. earles-closet.',
             'slug.not_in' => 'That link is reserved. Try another.',
@@ -186,6 +193,19 @@ class ShopController extends Controller
         $shop->forceFill(['blocked_phones' => $list->values()->all()])->save();
 
         return response()->json(['blocked_phones' => $shop->blocked_phones]);
+    }
+
+    /** Shop Insights (Pro): visitors, funnel, products, sources, searches, highlights. */
+    public function insights(Request $request, \App\Services\Shop\ShopInsights $insights)
+    {
+        $this->admin();
+        $shop = $this->shop();
+        if (! Shop::tenantQualifies($shop->tenant)) {
+            return response()->json(['message' => 'Shop Insights are part of the Pro plan.'], 403);
+        }
+        $range = in_array($request->query('range'), array_keys(\App\Services\Shop\ShopInsights::RANGES), true) ? $request->query('range') : '30d';
+
+        return response()->json($insights->build($shop, $range) + ['live' => $shop->isLive(), 'currency_symbol' => $shop->tenant->settings['currency_symbol'] ?? 'GH₵']);
     }
 
     // ---------------------------------------------------------------- orders

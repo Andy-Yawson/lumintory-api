@@ -105,6 +105,58 @@ class PublicShopController extends Controller
         ], 201);
     }
 
+    /**
+     * Anonymous visit events from the shop site (sent with navigator.sendBeacon as text/plain, so no
+     * CORS preflight). Bots are ignored. No personal data and no IP address are stored.
+     */
+    public function events(Request $request, string $ref)
+    {
+        $shop = Shop::findByRef($ref);
+        if (! $shop || ! $shop->isLive() || \App\Services\Shop\ShopInsights::isBot($request->userAgent())) {
+            return response()->noContent();
+        }
+        $body = json_decode($request->getContent() ?: '{}', true);
+        if (! is_array($body)) {
+            return response()->noContent();
+        }
+
+        $visitor = preg_replace('/[^A-Za-z0-9-]/', '', (string) ($body['visitor'] ?? ''));
+        if (strlen($visitor) < 8) {
+            return response()->noContent();
+        }
+        $src = is_array($body['source'] ?? null) ? $body['source'] : [];
+        $click = collect(['fbclid', 'gclid', 'ttclid'])->first(fn ($k) => ! empty($src[$k]));
+        $source = \App\Services\Shop\ShopInsights::classifySource($src['utm_source'] ?? null, $src['referrer'] ?? null, (bool) ($src['marketplace'] ?? false), $click);
+        $device = \App\Services\Shop\ShopInsights::device($request->userAgent());
+        // One-way, changes every day: enough to spot abuse, impossible to turn back into an address.
+        $ipHash = hash('sha256', $request->ip().'|'.now()->toDateString().'|'.config('app.key'));
+
+        $productIds = \App\Models\Product::withoutGlobalScopes()->where('tenant_id', $shop->tenant_id)
+            ->whereIn('id', collect($body['events'] ?? [])->pluck('product_id')->filter()->map(fn ($v) => (int) $v)->unique())->pluck('id')->flip();
+
+        $rows = [];
+        foreach (array_slice((array) ($body['events'] ?? []), 0, 20) as $e) {
+            $type = (string) ($e['type'] ?? '');
+            if (! in_array($type, \App\Models\ShopEvent::TYPES, true)) {
+                continue;
+            }
+            $pid = isset($e['product_id']) && isset($productIds[(int) $e['product_id']]) ? (int) $e['product_id'] : null;
+            $rows[] = [
+                'shop_id' => $shop->id, 'type' => $type, 'product_id' => $pid, 'visitor_id' => substr($visitor, 0, 40),
+                'source' => $source, 'campaign' => isset($src['utm_campaign']) ? mb_substr((string) $src['utm_campaign'], 0, 80) : null,
+                'device' => $device,
+                'search' => $type === 'search' ? mb_substr(trim((string) ($e['search'] ?? '')), 0, 80) ?: null : null,
+                'results' => $type === 'search' && isset($e['results']) ? min(65535, max(0, (int) $e['results'])) : null,
+                'ip_hash' => $ipHash, 'created_at' => now(),
+            ];
+        }
+        if ($rows) {
+            \App\Models\ShopEvent::insert($rows);
+        }
+
+        return response()->noContent();
+    }
+
     public function report(Request $request, string $ref)
     {
         $shop = Shop::findByRef($ref);
