@@ -88,6 +88,7 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
 });
 Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
 Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
+Route::post('v1/public/shops/{ref}/events', [PublicShopController::class, 'events'])->middleware('throttle:120,1');
 
 Route::middleware(['auth:sanctum'])->post('/v1/logout', [AuthController::class, 'logout']);
 
@@ -107,6 +108,7 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::delete('/shop/banner', [ShopController::class, 'removeBanner']);
     Route::post('/shop/visibility', [ShopController::class, 'visibility']);
     Route::post('/shop/blocked-phones', [ShopController::class, 'blockPhone']);
+    Route::get('/shop/insights', [ShopController::class, 'insights']);
     Route::get('/shop/orders', [ShopController::class, 'orders']);
     Route::get('/shop/orders/{id}', [ShopController::class, 'order'])->whereNumber('id');
     Route::patch('/shop/orders/{id}', [ShopController::class, 'updateOrder'])->whereNumber('id');

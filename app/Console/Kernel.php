@@ -17,6 +17,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('stores:sync')->hourly();
         // Expired sign-in tokens: access tokens (Sanctum) and refresh tokens.
         $schedule->command('sanctum:prune-expired --hours=24')->daily();
+        // Shop Insights: Monday 8am (Ghana time = UTC) digest, and drop visit events after 13 months.
+        $schedule->command('shop:weekly-digest')->weeklyOn(1, '08:00');
+        $schedule->call(fn () => \App\Models\ShopEvent::where('created_at', '<', now()->subMonths(13))->delete())->daily()->name('prune-shop-events');
         $schedule->call(fn () => \App\Services\AuthSessions::prune())->daily()->name('prune-refresh-tokens');
     }
 

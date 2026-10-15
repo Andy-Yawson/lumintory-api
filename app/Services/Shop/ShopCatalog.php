@@ -35,6 +35,8 @@ class ShopCatalog
             'delivery_note' => $shop->delivery_note,
             // The details themselves are only revealed after an order is placed.
             'accepts_momo' => (bool) $shop->momo(),
+            // The owner's own pixels: loaded on their shop pages alongside Zinnvy's.
+            'tracking' => array_filter(['meta' => $shop->meta_pixel_id, 'ga' => $shop->ga_measurement_id, 'tiktok' => $shop->tiktok_pixel_id]) ?: null,
             'banner_url' => $shop->bannerUrl(),
             'banner_framing' => $shop->bannerFraming(),
             'brand' => $tenant->brand,

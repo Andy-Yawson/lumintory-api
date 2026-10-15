@@ -99,6 +99,7 @@ class ShopOrderService
                 'address' => $data['fulfilment'] === 'delivery' ? trim((string) ($data['address'] ?? '')) : null,
                 'note' => isset($data['note']) ? trim($data['note']) ?: null : null,
                 'source' => self::cleanSource($data['source'] ?? null),
+                'visitor_id' => isset($data['visitor']) ? substr(preg_replace('/[^A-Za-z0-9-]/', '', (string) $data['visitor']), 0, 40) ?: null : null,
                 'subtotal' => array_sum(array_column($lines, 'line_total')),
                 'item_count' => (int) ceil(array_sum(array_column($lines, 'quantity'))),
                 'ip_hash' => $ip ? hash('sha256', $ip.config('app.key')) : null,
