@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\OnboardingController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\PublicShopController;
 use App\Http\Controllers\Api\ShopController;
+use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\ProductVideoController;
 use App\Http\Controllers\Api\SaleImportController;
 use App\Http\Controllers\Api\TokenController;
@@ -89,6 +90,11 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
 Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
 Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
 Route::post('v1/public/shops/{ref}/events', [PublicShopController::class, 'events'])->middleware('throttle:120,1');
+Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
+    Route::get('shops/{ref}/services', [PublicShopController::class, 'services']);
+    Route::get('shops/{ref}/services/{id}/availability', [PublicShopController::class, 'serviceAvailability'])->whereNumber('id');
+});
+Route::post('v1/public/shops/{ref}/bookings', [PublicShopController::class, 'book'])->middleware('throttle:6,10');
 
 Route::middleware(['auth:sanctum'])->post('/v1/logout', [AuthController::class, 'logout']);
 
@@ -109,6 +115,16 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::post('/shop/visibility', [ShopController::class, 'visibility']);
     Route::post('/shop/blocked-phones', [ShopController::class, 'blockPhone']);
     Route::get('/shop/insights', [ShopController::class, 'insights']);
+    Route::get('/bookings/settings', [BookingController::class, 'settings']);
+    Route::put('/bookings/settings', [BookingController::class, 'updateSettings']);
+    Route::get('/bookings/services', [BookingController::class, 'services']);
+    Route::post('/bookings/services', [BookingController::class, 'storeService']);
+    Route::put('/bookings/services/{id}', [BookingController::class, 'updateService'])->whereNumber('id');
+    Route::delete('/bookings/services/{id}', [BookingController::class, 'destroyService'])->whereNumber('id');
+    Route::post('/bookings/services/{id}/image', [BookingController::class, 'serviceImage'])->whereNumber('id');
+    Route::get('/bookings', [BookingController::class, 'index']);
+    Route::patch('/bookings/{id}', [BookingController::class, 'update'])->whereNumber('id');
+    Route::post('/bookings/{id}/reschedule', [BookingController::class, 'reschedule'])->whereNumber('id');
     Route::get('/shop/orders', [ShopController::class, 'orders']);
     Route::get('/shop/orders/{id}', [ShopController::class, 'order'])->whereNumber('id');
     Route::patch('/shop/orders/{id}', [ShopController::class, 'updateOrder'])->whereNumber('id');

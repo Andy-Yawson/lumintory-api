@@ -137,6 +137,7 @@ class ShopInsights
             'order_value' => round((float) $this->orders($shop, $from, $to)->sum('subtotal'), 2),
             'shares' => (int) $e()->where('type', 'share')->count(),
             'chats' => (int) $e()->where('type', 'chat')->count(),
+            'bookings' => (int) \App\Models\Booking::withoutGlobalScopes()->where('shop_id', $shop->id)->whereBetween('created_at', [$from, $to])->count(),
             'ordering_visitors' => $orderingVisitors,
             'conversion' => $visitors ? round(min($orderingVisitors, $visitors) / $visitors * 100, 1) : 0.0,
         ];
