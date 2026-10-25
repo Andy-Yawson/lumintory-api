@@ -54,8 +54,17 @@ class PublicShopController extends Controller
     {
         $shop = $this->liveShop($ref);
         $product = $this->catalog->withRelations($this->catalog->visible($shop->tenant_id))->findOrFail($id);
+        $payload = $this->catalog->productPayload($product, full: true);
+        // Services offered with this product ("Book installation" on a wig).
+        if ($shop->bookings_enabled) {
+            $services = \App\Models\ShopService::withoutGlobalScopes()->where('shop_id', $shop->id)->where('active', true)
+                ->whereJsonContains('product_ids', $product->id)->orderBy('position')->get();
+            if ($services->isNotEmpty()) {
+                $payload['services'] = $services->map(fn ($sv) => self::servicePayload($sv))->values();
+            }
+        }
 
-        return response()->json($this->catalog->productPayload($product, full: true));
+        return response()->json($payload);
     }
 
     public function placeOrder(Request $request, string $ref, ShopOrderService $orders)
@@ -156,6 +165,80 @@ class PublicShopController extends Controller
         }
 
         return response()->noContent();
+    }
+
+    // ---------------------------------------------------------------- bookings
+
+    private function bookableShop(string $ref): Shop
+    {
+        $shop = $this->liveShop($ref);
+        abort_unless($shop->bookings_enabled, 404, 'This shop does not take bookings.');
+
+        return $shop;
+    }
+
+    public static function servicePayload(\App\Models\ShopService $s): array
+    {
+        return ['id' => $s->id, 'name' => $s->name, 'description' => $s->description, 'price' => $s->price, 'price_from' => $s->price_from,
+            'duration_minutes' => $s->duration_minutes, 'location' => $s->location, 'travel_note' => $s->travel_note, 'image' => $s->image_url];
+    }
+
+    public function services(string $ref)
+    {
+        $shop = $this->bookableShop($ref);
+
+        return response()->json(['data' => \App\Models\ShopService::withoutGlobalScopes()->where('shop_id', $shop->id)->where('active', true)
+            ->orderBy('position')->orderBy('id')->get()->map(fn ($s) => self::servicePayload($s))]);
+    }
+
+    public function serviceAvailability(Request $request, string $ref, int $id, \App\Services\Shop\BookingSlots $slots)
+    {
+        $shop = $this->bookableShop($ref);
+        $service = \App\Models\ShopService::withoutGlobalScopes()->where('shop_id', $shop->id)->where('active', true)->findOrFail($id);
+        $date = $request->query('date');
+
+        return response()->json([
+            'service' => self::servicePayload($service),
+            'dates' => $slots->availableDates($shop, $service),
+            'date' => $date,
+            'times' => $date && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $slots->forDate($shop, $service, $date) : [],
+        ]);
+    }
+
+    public function book(Request $request, string $ref, \App\Services\Shop\BookingService $bookings)
+    {
+        $shop = $this->bookableShop($ref);
+        if (filled($request->input('website'))) {
+            return response()->json(['number' => random_int(1001, 1999), 'status' => 'requested'], 201);
+        }
+        $data = $request->validate([
+            'service_id' => 'required|integer',
+            'starts_at' => 'required|date_format:Y-m-d H:i',
+            'location' => 'nullable|in:shop,home',
+            'address' => 'nullable|string|max:300',
+            'name' => 'required|string|min:2|max:80',
+            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email|max:120',
+            'note' => 'nullable|string|max:500',
+            'for_product' => 'nullable|string|max:160',
+            'consent' => 'accepted',
+            'source' => 'nullable|array',
+            'source.*' => 'nullable|string|max:200',
+            'visitor' => 'nullable|string|max:40',
+            'turnstile_token' => 'nullable|string',
+        ], ['consent.accepted' => 'Please agree to share your details with the shop.']);
+        if (! ShopOrderService::phoneLooksValid($data['phone'])) {
+            throw ValidationException::withMessages(['phone' => 'Enter a valid phone number.']);
+        }
+        $this->checkTurnstile($data['turnstile_token'] ?? null, $request->ip());
+        $service = \App\Models\ShopService::withoutGlobalScopes()->where('shop_id', $shop->id)->where('active', true)->findOrFail($data['service_id']);
+        $b = $bookings->request($shop, $service, $data);
+
+        return response()->json([
+            'number' => $b->number, 'status' => $b->status, 'service' => $b->service_name,
+            'when' => \App\Services\Shop\BookingService::when($b), 'phone' => $b->customer_phone, 'momo' => $shop->momo(),
+            'price' => $b->price, 'price_from' => (bool) ($service->price_from),
+        ], 201);
     }
 
     public function report(Request $request, string $ref)

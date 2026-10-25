@@ -26,6 +26,7 @@ class Shop extends Model
         'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
         'banner_focus_x', 'banner_focus_y', 'banner_zoom',
         'meta_pixel_id', 'ga_measurement_id', 'tiktok_pixel_id',
+        'bookings_enabled', 'booking_hours', 'booking_blocked_dates', 'booking_notice_hours', 'booking_max_days', 'booking_buffer_minutes',
     ];
 
     protected $casts = [
@@ -35,6 +36,9 @@ class Shop extends Model
         'delivery' => 'boolean',
         'blocked_phones' => 'array',
         'unlisted_at' => 'datetime',
+        'bookings_enabled' => 'boolean',
+        'booking_hours' => 'array',
+        'booking_blocked_dates' => 'array',
     ];
 
     protected static function booted(): void
