@@ -314,3 +314,9 @@ Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fun
     Route::post('/add-user', [AuthController::class, 'addUserAdmin']);
 
 });
+// Zinnvy Identity admin console: read-only account summaries (shared-secret auth, no tenant user).
+Route::prefix('v1/platform/admin')->middleware(['platform.admin', 'throttle:120,1'])->group(function () {
+    Route::get('/accounts/{sub}', [\App\Http\Controllers\Api\PlatformAdminController::class, 'account']);
+    Route::post('/lifecycle', [\App\Http\Controllers\Api\PlatformAdminController::class, 'lifecycle']);
+    Route::get('/overview', [\App\Http\Controllers\Api\PlatformAdminController::class, 'overview']);
+});

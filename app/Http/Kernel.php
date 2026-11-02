@@ -66,6 +66,7 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
+        'platform.admin' => \App\Http\Middleware\PlatformAdminAuth::class,
         'integration.auth' => \App\Http\Middleware\IntegrationApiAuth::class,
         'limit.sms' => \App\Http\Middleware\CheckSmsCredits::class,
         'limit.customers' => \App\Http\Middleware\EnsureCanCreateCustomer::class,

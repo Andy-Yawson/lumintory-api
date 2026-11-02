@@ -70,4 +70,10 @@ return [
         'api_version' => env('SHOPIFY_API_VERSION', '2026-07'),
     ],
 
+
+    // Shared secret the Zinnvy Identity admin console presents to /v1/platform/admin/*.
+    'zinnvy_platform' => [
+        'admin_token' => env('ZINNVY_PLATFORM_ADMIN_TOKEN'),
+    ],
+
 ];
