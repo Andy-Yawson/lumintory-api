@@ -67,6 +67,15 @@ class PublicShopController extends Controller
         return response()->json($payload);
     }
 
+    /** What a Zinnvy rider would cost to this spot, shown before the customer orders. */
+    public function deliveryQuote(Request $request, string $ref)
+    {
+        $shop = $this->liveShop($ref);
+        $q = \App\Services\Dispatch\Pricing::quote($shop, $request->query('lat') !== null ? (float) $request->query('lat') : null, $request->query('lng') !== null ? (float) $request->query('lng') : null);
+
+        return response()->json(['available' => $q['ok'], 'fee' => $q['fee'] / 100, 'distance_km' => $q['distance_km'], 'message' => $q['reason']]);
+    }
+
     public function placeOrder(Request $request, string $ref, ShopOrderService $orders)
     {
         $shop = $this->liveShop($ref);
@@ -82,6 +91,10 @@ class PublicShopController extends Controller
             'email' => 'nullable|email|max:120',
             'fulfilment' => 'required|in:pickup,delivery',
             'address' => 'required_if:fulfilment,delivery|nullable|string|max:300',
+            'payment_method' => 'nullable|in:later,momo_on_delivery',
+            'landmark' => 'nullable|string|max:200',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
             'note' => 'nullable|string|max:500',
             'consent' => 'accepted',
             'items' => 'required|array|min:1|max:30',
@@ -109,6 +122,9 @@ class PublicShopController extends Controller
             'number' => $order->number,
             'status' => $order->status,
             'subtotal' => (float) $order->subtotal,
+            'payment_method' => $order->payment_method,
+            'delivery_fee' => $order->delivery_fee / 100,
+            'total' => (float) $order->subtotal + $order->delivery_fee / 100,
             'shop' => $shop->tenant->name,
             'phone' => $order->customer_phone,
             'momo' => $shop->momo(),

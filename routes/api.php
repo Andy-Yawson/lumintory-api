@@ -87,6 +87,7 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
     Route::get('shops/{ref}/products', [PublicShopController::class, 'products']);
     Route::get('shops/{ref}/products/{id}', [PublicShopController::class, 'product'])->whereNumber('id');
 });
+Route::get('v1/public/shops/{ref}/delivery-quote', [PublicShopController::class, 'deliveryQuote'])->middleware('throttle:60,1');
 Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
 Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
 Route::post('v1/public/shops/{ref}/events', [PublicShopController::class, 'events'])->middleware('throttle:120,1');
@@ -129,6 +130,16 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
     Route::get('/shop/orders/{id}', [ShopController::class, 'order'])->whereNumber('id');
     Route::patch('/shop/orders/{id}', [ShopController::class, 'updateOrder'])->whereNumber('id');
     Route::post('/shop/orders/{id}/convert', [ShopController::class, 'convert'])->whereNumber('id');
+    // Zinnvy rider delivery
+    Route::post('/shop/orders/{id}/rider', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'request'])->whereNumber('id');
+    Route::post('/dispatch/jobs/{id}/cancel', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'cancel'])->whereNumber('id');
+    Route::middleware('workspace.admin')->prefix('wallet')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'wallet']);
+        Route::get('/entries', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'entries']);
+        Route::get('/withdrawals', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'withdrawals']);
+        Route::put('/payout', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'setPayout']);
+        Route::post('/withdraw', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'withdraw']);
+    });
     Route::get('/tenant/brand', [BrandController::class, 'show']);
     Route::post('/tenant/brand', [BrandController::class, 'update']);
     Route::post('/tenant/brand/logo', [BrandController::class, 'uploadLogo']);
@@ -261,7 +272,43 @@ Route::prefix('v1/integrations')->middleware('integration.auth')->group(function
 });
 
 
+// Riders' phone app: Zinnvy riders only.
+Route::middleware(['auth:sanctum', 'rider'])->prefix('v1/rider')->group(function () {
+    $c = \App\Http\Controllers\Api\RiderController::class;
+    Route::get('/me', [$c, 'me']);
+    Route::post('/onboarding', [$c, 'onboard']);
+    Route::post('/online', [$c, 'online']);
+    Route::get('/jobs', [$c, 'jobs']);
+    Route::post('/jobs/{id}/accept', [$c, 'accept'])->whereNumber('id');
+    Route::post('/jobs/{id}/decline', [$c, 'decline'])->whereNumber('id');
+    Route::post('/jobs/{id}/pickup', [$c, 'pickup'])->whereNumber('id');
+    Route::post('/jobs/{id}/collect', [$c, 'collect'])->whereNumber('id');
+    Route::post('/jobs/{id}/pay-link', [$c, 'sendPayLink'])->whereNumber('id');
+    Route::get('/jobs/{id}/payment', [$c, 'checkPayment'])->whereNumber('id');
+    Route::post('/jobs/{id}/deliver', [$c, 'deliver'])->whereNumber('id');
+    Route::post('/jobs/{id}/fail', [$c, 'fail'])->whereNumber('id');
+    Route::get('/wallet', [$c, 'wallet']);
+    Route::get('/wallet/entries', [$c, 'entries']);
+    Route::get('/wallet/withdrawals', [$c, 'withdrawals']);
+    Route::put('/wallet/payout', [$c, 'setPayout']);
+    Route::post('/wallet/withdraw', [$c, 'withdraw']);
+});
+
+// Delivery payments from Zinnvy Pay (signature only).
+Route::post('v1/webhooks/pay-dispatch', \App\Http\Controllers\Api\DispatchPayWebhookController::class)->middleware('throttle:300,1');
+
 Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(function () {
+    // Dispatch: riders, jobs and the rules
+    Route::get('/dispatch/overview', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'overview']);
+    Route::get('/dispatch/riders', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'riders']);
+    Route::post('/dispatch/riders', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'invite']);
+    Route::patch('/dispatch/riders/{id}', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'updateRider'])->whereNumber('id');
+    Route::get('/dispatch/riders/{id}/documents', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'documents'])->whereNumber('id');
+    Route::get('/dispatch/jobs', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'jobs']);
+    Route::post('/dispatch/jobs/{id}/assign', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'assign'])->whereNumber('id');
+    Route::get('/dispatch/settings', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'settings']);
+    Route::put('/dispatch/settings', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'updateSettings']);
+
     // Tenants
     Route::get('/tenants', [AdminTenantController::class, 'index']);
     Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show']);

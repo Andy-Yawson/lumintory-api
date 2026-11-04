@@ -77,6 +77,7 @@ class Kernel extends HttpKernel
         'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
         'limit.ticket' => \App\Http\Middleware\CheckSupportTicketLimit::class,
         'superadmin' => \App\Http\Middleware\EnsureSuperAdmin::class,
+        'rider' => \App\Http\Middleware\EnsureRider::class,
         'workspace.admin' => \App\Http\Middleware\EnsureWorkspaceAdmin::class,
         'workspace.active' => \App\Http\Middleware\EnsureWorkspaceActive::class,
     ];

@@ -23,6 +23,7 @@ class Shop extends Model
     protected $fillable = [
         'tenant_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp',
         'notify_phone', 'hours', 'pickup', 'delivery', 'delivery_note',
+        'pickup_address', 'pickup_phone', 'pickup_lat', 'pickup_lng', 'rider_delivery',
         'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
         'banner_focus_x', 'banner_focus_y', 'banner_zoom',
         'meta_pixel_id', 'ga_measurement_id', 'tiktok_pixel_id',
@@ -34,6 +35,7 @@ class Shop extends Model
         'in_marketplace' => 'boolean',
         'pickup' => 'boolean',
         'delivery' => 'boolean',
+        'rider_delivery' => 'boolean',
         'blocked_phones' => 'array',
         'unlisted_at' => 'datetime',
         'bookings_enabled' => 'boolean',

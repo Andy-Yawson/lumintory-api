@@ -35,6 +35,17 @@ class ShopOrderService
         if (! in_array($data['fulfilment'], array_keys(array_filter(['pickup' => $shop->pickup, 'delivery' => $shop->delivery])), true)) {
             throw ValidationException::withMessages(['fulfilment' => 'This shop doesn\'t offer that option.']);
         }
+        $payOnArrival = ($data['payment_method'] ?? 'later') === 'momo_on_delivery';
+        $quote = null;
+        if ($payOnArrival) {
+            if ($data['fulfilment'] !== 'delivery') {
+                throw ValidationException::withMessages(['payment_method' => 'Pay on arrival is for delivery orders.']);
+            }
+            $quote = \App\Services\Dispatch\Pricing::quote($shop, isset($data['lat']) ? (float) $data['lat'] : null, isset($data['lng']) ? (float) $data['lng'] : null);
+            if (! $quote['ok']) {
+                throw ValidationException::withMessages(['address' => $quote['reason']]);
+            }
+        }
         if ($shop->isBlocked($phone)) {
             throw ValidationException::withMessages(['phone' => 'This shop isn\'t accepting orders from this number.']);
         }
@@ -84,7 +95,7 @@ class ShopOrderService
             ];
         }
 
-        $order = DB::transaction(function () use ($shop, $tenantId, $data, $phone, $lines, $ip) {
+        $order = DB::transaction(function () use ($shop, $tenantId, $data, $phone, $lines, $ip, $payOnArrival, $quote) {
             // Per-workspace order numbers (#1001, #1002…); the row lock keeps two orders from sharing one.
             $last = ShopOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->lockForUpdate()->max('number');
 
@@ -100,6 +111,12 @@ class ShopOrderService
                 'note' => isset($data['note']) ? trim($data['note']) ?: null : null,
                 'source' => self::cleanSource($data['source'] ?? null),
                 'visitor_id' => isset($data['visitor']) ? substr(preg_replace('/[^A-Za-z0-9-]/', '', (string) $data['visitor']), 0, 40) ?: null : null,
+                'payment_method' => $payOnArrival ? 'momo_on_delivery' : 'later',
+                'delivery_fee' => $quote['fee'] ?? 0,
+                'landmark' => isset($data['landmark']) ? trim($data['landmark']) ?: null : null,
+                'delivery_lat' => $payOnArrival ? $data['lat'] : null,
+                'delivery_lng' => $payOnArrival ? $data['lng'] : null,
+                'distance_km' => $quote['distance_km'] ?? null,
                 'subtotal' => array_sum(array_column($lines, 'line_total')),
                 'item_count' => (int) ceil(array_sum(array_column($lines, 'quantity'))),
                 'ip_hash' => $ip ? hash('sha256', $ip.config('app.key')) : null,
@@ -133,7 +150,7 @@ class ShopOrderService
                 .'Fulfilment: '.ucfirst($order->fulfilment).($order->address ? " to {$order->address}" : '')."\n"
                 .($order->note ? "Note: {$order->note}\n" : '')
                 .(self::sourceLabel($order->source) ? 'Came from: '.self::sourceLabel($order->source)."\n" : '')
-                ."\n{$items}\n\nTotal: ".$money($order->subtotal)."\n\n"
+                ."\n{$items}\n\nTotal: ".$money($order->subtotal).($order->payment_method === 'momo_on_delivery' ? ' + delivery '.$money($order->delivery_fee / 100).' (customer pays by Mobile Money when the Zinnvy rider arrives; after you confirm, tap Request rider)' : '')."\n\n"
                 ."Chat on WhatsApp: {$wa}\nOpen the order: {$dashboard}\n\n"
                 ."No payment has been taken. Contact the customer to confirm.\n\nZinnvy.";
             User::where('tenant_id', $tenant->id)->where('role', 'Administrator')->pluck('email')

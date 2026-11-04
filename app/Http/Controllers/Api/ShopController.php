@@ -38,6 +38,7 @@ class ShopController extends Controller
         return $shop->only([
             'public_id', 'slug', 'enabled', 'in_marketplace', 'tagline', 'about', 'city', 'whatsapp', 'notify_phone',
             'hours', 'pickup', 'delivery', 'delivery_note', 'blocked_phones',
+            'pickup_address', 'pickup_phone', 'pickup_lat', 'pickup_lng', 'rider_delivery',
             'momo_network', 'momo_number', 'momo_name', 'momo_merchant_id',
             'meta_pixel_id', 'ga_measurement_id', 'tiktok_pixel_id',
         ]) + [
@@ -77,6 +78,11 @@ class ShopController extends Controller
             'pickup' => 'sometimes|boolean',
             'delivery' => 'sometimes|boolean',
             'delivery_note' => 'sometimes|nullable|string|max:200',
+            'pickup_address' => 'sometimes|nullable|string|max:300',
+            'pickup_phone' => 'sometimes|nullable|string|max:20',
+            'pickup_lat' => 'sometimes|nullable|numeric|between:-90,90',
+            'pickup_lng' => 'sometimes|nullable|numeric|between:-180,180',
+            'rider_delivery' => 'sometimes|boolean',
             'meta_pixel_id' => ['sometimes', 'nullable', 'regex:/^\d{8,20}$/'],
             'ga_measurement_id' => ['sometimes', 'nullable', 'regex:/^G-[A-Z0-9]{4,20}$/i'],
             'tiktok_pixel_id' => ['sometimes', 'nullable', 'regex:/^[A-Z0-9]{8,40}$/i'],
@@ -100,6 +106,21 @@ class ShopController extends Controller
 
         if (($data['enabled'] ?? false) && ! Shop::tenantQualifies($shop->tenant)) {
             return response()->json(['message' => 'The online shop is part of the Pro plan. Upgrade to switch it on.'], 403);
+        }
+        if ($data['rider_delivery'] ?? false) {
+            $lat = $data['pickup_lat'] ?? $shop->pickup_lat;
+            $lng = $data['pickup_lng'] ?? $shop->pickup_lng;
+            $msg = null;
+            if (! ($data['delivery'] ?? $shop->delivery)) {
+                $msg = 'Switch on delivery to offer Zinnvy riders.';
+            } elseif (! ($data['pickup_address'] ?? $shop->pickup_address) || $lat === null || $lng === null) {
+                $msg = 'Add your pickup address and drop a pin on the map so riders can find you.';
+            } elseif (! \App\Services\Dispatch\Pricing::inServiceArea((float) $lat, (float) $lng)) {
+                $msg = 'Zinnvy riders only work in Accra for now. Your pickup pin is outside it.';
+            }
+            if ($msg) {
+                return response()->json(['message' => $msg, 'errors' => ['rider_delivery' => [$msg]]], 422);
+            }
         }
         $pickup = $data['pickup'] ?? $shop->pickup;
         $delivery = $data['delivery'] ?? $shop->delivery;
@@ -235,7 +256,9 @@ class ShopController extends Controller
         $order = ShopOrder::with('items')->findOrFail($id);
         $shop = $this->shop();
 
-        return response()->json($order->toArray() + ['phone_blocked' => $shop->isBlocked($order->customer_phone)]);
+        $job = \App\Models\Dispatch\Job::with('rider')->where('shop_order_id', $order->id)->latest('id')->first();
+
+        return response()->json($order->toArray() + ['phone_blocked' => $shop->isBlocked($order->customer_phone), 'delivery_job' => $job ? \App\Http\Controllers\Api\DispatchOwnerController::jobPayload($job) : null]);
     }
 
     public function updateOrder(Request $request, int $id)

@@ -38,6 +38,13 @@ return [
         'webhook_secret' => env('PAY_WEBHOOK_SECRET'),
     ],
 
+    // Zinnvy Dispatch's own Pay merchant: delivery payments land here and are split into wallets.
+    'pay_dispatch' => [
+        'url' => env('PAY_API_URL'),
+        'secret_key' => env('PAY_DISPATCH_SECRET_KEY'),
+        'webhook_secret' => env('PAY_DISPATCH_WEBHOOK_SECRET'),
+    ],
+
     // Public URL of the Inventory web app; OAuth callbacks send people back here.
     'frontend_url' => env('FRONTEND_URL'),
 
