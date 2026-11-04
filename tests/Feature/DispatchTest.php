@@ -180,6 +180,39 @@ class DispatchTest extends TestCase
         Http::assertSent(fn ($r) => str_ends_with($r->url(), '/v1/payment_intents') && $r->method() === 'POST' && $r['reference'] === 'job-'.Job::find($jobId)->code.'-2');
     }
 
+    public function test_the_customer_tracking_link_shows_progress_and_only_what_they_need(): void
+    {
+        $order = $this->confirmed();
+        [$rider, $riderUser] = $this->activeRider();
+        Sanctum::actingAs($this->owner);
+        $jobId = $this->postJson("/api/v1/shop/orders/{$order->id}/rider")->json('id');
+        $sms = SmsLog::where('recipient', '233244000111')->where('message', 'like', '%Follow it here:%')->firstOrFail();
+        preg_match('#/track/([A-Za-z0-9]+)#', $sms->message, $m);
+        $token = $m[1];
+
+        $this->getJson("/api/v1/public/track/{$token}")->assertOk()->assertJsonPath('status', 'searching')->assertJsonPath('rider', null)->assertJsonPath('shop', 'Akosua Boutique');
+        $this->getJson('/api/v1/public/track/'.str_repeat('x', 32))->assertNotFound();
+
+        Sanctum::actingAs($riderUser);
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/accept")->assertOk();
+        $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('status', 'assigned')->assertJsonPath('rider.name', 'Kofi')->assertJsonPath('code', null);
+
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/pickup")->assertOk();
+        $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('status', 'picked_up')->assertJsonPath('code', null)->assertJsonPath('pay_url', null);
+
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/collect")->assertOk();
+        $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('pay_url', 'https://pay.test/c/?t=abc')->assertJsonPath('code', null);
+
+        $this->payStatus = 'succeeded';
+        $this->getJson("/api/v1/rider/jobs/{$jobId}/payment")->assertOk();
+        $paid = $this->getJson("/api/v1/public/track/{$token}")->assertOk();
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $paid->json('code'));
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/deliver", ['code' => $paid->json('code')])->assertOk();
+        $done = $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('status', 'delivered');
+        $this->assertNull($done->json('rider'));
+        $this->assertNull($done->json('code'));
+    }
+
     public function test_wrong_codes_lock_out_after_a_few_tries(): void
     {
         $order = $this->confirmed();

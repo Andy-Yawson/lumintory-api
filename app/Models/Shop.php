@@ -16,7 +16,7 @@ class Shop extends Model
     public const RESERVED_SLUGS = [
         'shop', 'shops', 'api', 'admin', 'www', 'zinnvy', 'login', 'signin', 'register', 'cart', 'checkout',
         'search', 'about', 'terms', 'privacy', 'help', 'support', 'orders', 'order', 'static', 'assets', 'p',
-        'product', 'products', 'category', 'categories', 'sitemap', 'robots', 'favicon', 'report', 'sell', 'inventory',
+        'product', 'products', 'track', 'category', 'categories', 'sitemap', 'robots', 'favicon', 'report', 'sell', 'inventory',
         'feed', 'feeds', 'manifest', 'icon', 'apple-icon', 'opengraph-image', 'twitter-image', 'go', 'r', 'qr',
     ];
 

@@ -12,7 +12,7 @@ class Job extends Model
 
     protected $guarded = ['id'];
 
-    protected $hidden = ['handover_code_hash'];
+    protected $hidden = ['handover_code_hash', 'handover_code_enc', 'track_token'];
 
     protected $casts = [
         'rates' => 'array', 'paid_at' => 'datetime', 'assigned_at' => 'datetime', 'picked_up_at' => 'datetime',
@@ -62,6 +62,12 @@ class Job extends Model
     public function platformShare(): int
     {
         return $this->delivery_fee - $this->rider_share + $this->goods_commission;
+    }
+
+    /** The link the customer gets by SMS. */
+    public function trackUrl(): ?string
+    {
+        return $this->track_token ? rtrim((string) config('services.shop.url', 'https://shop.zinnvy.com'), '/').'/track/'.$this->track_token : null;
     }
 
     public function ownerWalletRef(): string

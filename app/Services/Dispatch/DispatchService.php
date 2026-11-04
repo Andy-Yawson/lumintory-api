@@ -60,6 +60,7 @@ class DispatchService
 
         $job = Job::create([
             'code' => $this->newCode(),
+            'track_token' => Str::random(32),
             'tenant_id' => $order->tenant_id,
             'shop_order_id' => $order->id,
             'status' => 'searching',
@@ -82,8 +83,10 @@ class DispatchService
             'rates' => $split['rates'],
         ]);
         $this->offerToRiders($job);
+        $job->refresh();
+        $this->sms($job, $job->dropoff_phone, "Your {$job->pickup_name} order #{$order->number} is being arranged for delivery. Follow it here: {$job->trackUrl()}");
 
-        return $job->refresh();
+        return $job;
     }
 
     public function cancel(Job $job): Job
@@ -189,9 +192,9 @@ class DispatchService
     public function pickUp(Rider $rider, Job $job): Job
     {
         $code = (string) random_int(1000, 9999);
-        $this->riderTransition($rider, $job, ['assigned'], fn (Job $j) => $j->update(['status' => 'picked_up', 'picked_up_at' => now(), 'handover_code_hash' => $this->hash($j, $code)]), 'Accept this delivery before picking it up.');
+        $this->riderTransition($rider, $job, ['assigned'], fn (Job $j) => $j->update(['status' => 'picked_up', 'picked_up_at' => now(), 'handover_code_hash' => $this->hash($j, $code), 'handover_code_enc' => \Illuminate\Support\Facades\Crypt::encryptString($code)]), 'Accept this delivery before picking it up.');
         $job->refresh();
-        $this->sms($job, $job->dropoff_phone, "Your {$job->pickup_name} order is on its way with Zinnvy rider {$rider->name} ({$rider->phone}). You will pay GH₵ ".number_format($job->total() / 100, 2)." by Mobile Money when it arrives. Give the rider this code after paying: {$code}");
+        $this->sms($job, $job->dropoff_phone, "Your {$job->pickup_name} order is on its way with Zinnvy rider {$rider->name} ({$rider->phone}). You will pay GH₵ ".number_format($job->total() / 100, 2)." by Mobile Money when it arrives. Give the rider this code after paying: {$code}. Track it: {$job->trackUrl()}");
 
         return $job;
     }

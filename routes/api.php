@@ -87,6 +87,7 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
     Route::get('shops/{ref}/products', [PublicShopController::class, 'products']);
     Route::get('shops/{ref}/products/{id}', [PublicShopController::class, 'product'])->whereNumber('id');
 });
+Route::get('v1/public/track/{token}', [\App\Http\Controllers\Api\DispatchTrackController::class, 'show'])->middleware('throttle:90,1');
 Route::get('v1/public/shops/{ref}/delivery-quote', [PublicShopController::class, 'deliveryQuote'])->middleware('throttle:60,1');
 Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
 Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
