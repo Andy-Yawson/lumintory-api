@@ -101,6 +101,11 @@ class ZinnvyAuthController extends Controller
             }
         }
 
+        // The riders' own address only signs in invited riders: never offer them a shop workspace.
+        if (($stateData['app'] ?? null) === 'rider' && (! $user || strtolower((string) $user->role) !== 'rider')) {
+            return redirect("{$frontend}?error=not_a_rider");
+        }
+
         if (! $user && ! $emailVerified) {
             // Never link an invite, and never create a workspace, on an email Zinnvy hasn't verified:
             // that would let someone claim an address they don't own.
