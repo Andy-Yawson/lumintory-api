@@ -88,6 +88,7 @@ Route::prefix('v1/public')->middleware('throttle:120,1')->group(function () {
     Route::get('shops/{ref}/products/{id}', [PublicShopController::class, 'product'])->whereNumber('id');
 });
 Route::get('v1/public/track/{token}', [\App\Http\Controllers\Api\DispatchTrackController::class, 'show'])->middleware('throttle:90,1');
+Route::post('v1/public/track/{token}/rating', [\App\Http\Controllers\Api\DispatchTrackController::class, 'rate'])->middleware('throttle:10,1');
 Route::get('v1/public/shops/{ref}/delivery-quote', [PublicShopController::class, 'deliveryQuote'])->middleware('throttle:60,1');
 Route::post('v1/public/shops/{ref}/orders', [PublicShopController::class, 'placeOrder'])->middleware('throttle:6,10');
 Route::post('v1/public/shops/{ref}/report', [PublicShopController::class, 'report'])->middleware('throttle:3,60');
@@ -138,6 +139,7 @@ Route::middleware(['auth:sanctum', 'workspace.active'])->prefix('v1')->group(fun
         Route::get('/', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'wallet']);
         Route::get('/entries', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'entries']);
         Route::get('/withdrawals', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'withdrawals']);
+        Route::get('/statement', [\App\Http\Controllers\Api\DispatchStatementController::class, 'show']);
         Route::put('/payout', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'setPayout']);
         Route::post('/withdraw', [\App\Http\Controllers\Api\DispatchOwnerController::class, 'withdraw']);
     });
@@ -304,6 +306,7 @@ $dispatchStaff = function (array $writes) {
     Route::get('/dispatch/overview', [$c, 'overview']);
     Route::get('/dispatch/riders', [$c, 'riders']);
     Route::get('/dispatch/riders/{id}/documents', [$c, 'documents'])->whereNumber('id');
+    Route::get('/dispatch/riders/{id}/ratings', [$c, 'ratings'])->whereNumber('id');
     Route::get('/dispatch/jobs', [$c, 'jobs']);
     Route::get('/dispatch/settings', [$c, 'settings']);
     Route::middleware($writes)->group(function () use ($c) {

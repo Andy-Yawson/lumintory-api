@@ -25,6 +25,14 @@ class Rider extends Model
         return $this->hasMany(Job::class, 'rider_id');
     }
 
+    /** @return array{avg: ?float, count: int} the customers' average (1-5) over rated deliveries */
+    public function ratingSummary(): array
+    {
+        $row = Job::where('rider_id', $this->id)->whereNotNull('rating')->selectRaw('count(*) as n, avg(rating) as a')->first();
+
+        return ['avg' => $row->n ? round((float) $row->a, 2) : null, 'count' => (int) $row->n];
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

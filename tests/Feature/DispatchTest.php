@@ -213,6 +213,75 @@ class DispatchTest extends TestCase
         $this->assertNull($done->json('code'));
     }
 
+    private function deliveredJob(): array
+    {
+        $order = $this->confirmed();
+        [$rider, $riderUser] = $this->activeRider();
+        Sanctum::actingAs($this->owner);
+        $jobId = $this->postJson("/api/v1/shop/orders/{$order->id}/rider")->json('id');
+        $sms = SmsLog::where('recipient', '233244000111')->where('message', 'like', '%Follow it here:%')->firstOrFail();
+        preg_match('#/track/([A-Za-z0-9]+)#', $sms->message, $m);
+        Sanctum::actingAs($riderUser);
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/accept")->assertOk();
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/pickup")->assertOk();
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/collect")->assertOk();
+        $this->payStatus = 'succeeded';
+        $this->getJson("/api/v1/rider/jobs/{$jobId}/payment")->assertOk();
+        $code = $this->getJson("/api/v1/public/track/{$m[1]}")->json('code');
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/deliver", ['code' => $code])->assertOk();
+
+        return [$jobId, $m[1], $rider, $riderUser];
+    }
+
+    public function test_customers_rate_a_delivery_once_and_riders_see_their_average(): void
+    {
+        [$jobId, $token, $rider, $riderUser] = $this->deliveredJob();
+        $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('can_rate', true)->assertJsonPath('rating', null);
+        $this->postJson("/api/v1/public/track/{$token}/rating", ['rating' => 6])->assertStatus(422);
+        $this->postJson("/api/v1/public/track/{$token}/rating", ['rating' => 5, 'comment' => 'Fast and polite'])->assertCreated();
+        $this->postJson("/api/v1/public/track/{$token}/rating", ['rating' => 1])->assertStatus(422);   // once only
+        $this->getJson("/api/v1/public/track/{$token}")->assertJsonPath('can_rate', false)->assertJsonPath('rating.value', 5);
+
+        Sanctum::actingAs($riderUser);
+        $this->getJson('/api/v1/rider/me')->assertJsonPath('rating.avg', 5)->assertJsonPath('rating.count', 1);
+        $admin = User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'superadmin']);
+        Sanctum::actingAs($admin);
+        $this->getJson("/api/v1/admin/dispatch/riders/{$rider->id}/ratings")->assertOk()->assertJsonPath('data.0.comment', 'Fast and polite')->assertJsonPath('summary.count', 1);
+    }
+
+    public function test_a_delivery_that_is_not_finished_cannot_be_rated(): void
+    {
+        $order = $this->confirmed();
+        Sanctum::actingAs($this->owner);
+        $this->postJson("/api/v1/shop/orders/{$order->id}/rider")->assertCreated();
+        $sms = SmsLog::where('message', 'like', '%Follow it here:%')->firstOrFail();
+        preg_match('#/track/([A-Za-z0-9]+)#', $sms->message, $m);
+        $this->postJson("/api/v1/public/track/{$m[1]}/rating", ['rating' => 5])->assertStatus(422);
+    }
+
+    public function test_the_owner_statement_lists_delivered_orders_with_totals_and_csv(): void
+    {
+        $this->deliveredJob();
+        Sanctum::actingAs($this->owner);
+        Http::fake(['pay.test/v1/wallets/*/withdrawals' => Http::response(['data' => []])] + [
+            'pay.test/*' => Http::response([]),
+        ]);
+        $r = $this->getJson('/api/v1/wallet/statement?from='.now()->subDay()->toDateString().'&to='.now()->addDay()->toDateString())->assertOk();
+        $this->assertSame(1, $r->json('totals.deliveries'));
+        $this->assertEquals(200.0, $r->json('totals.you_received'));
+        $this->assertEquals($r->json('rows.0.customer_paid'), $r->json('rows.0.goods') + $r->json('rows.0.delivery_fee'));
+        $csv = $this->get('/api/v1/wallet/statement?format=csv&from='.now()->subDay()->toDateString().'&to='.now()->addDay()->toDateString())->assertOk();
+        $this->assertStringContainsString('You received', $csv->streamedContent());
+        $this->assertStringContainsString('Total', $csv->streamedContent());
+
+        // Another workspace never sees these rows, and a non-admin cannot open the statement at all.
+        $other = Tenant::factory()->create(['plan' => 'pro']);
+        Sanctum::actingAs(User::factory()->create(['tenant_id' => $other->id, 'role' => 'Administrator']));
+        $this->getJson('/api/v1/wallet/statement?from='.now()->subDay()->toDateString().'&to='.now()->addDay()->toDateString())->assertJsonPath('totals.deliveries', 0);
+        Sanctum::actingAs(User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'Sales']));
+        $this->getJson('/api/v1/wallet/statement')->assertForbidden();
+    }
+
     public function test_wrong_codes_lock_out_after_a_few_tries(): void
     {
         $order = $this->confirmed();

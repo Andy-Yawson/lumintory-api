@@ -26,7 +26,7 @@ class RiderController extends Controller
     public static function payload(Rider $r): array
     {
         return $r->only(['id', 'name', 'phone', 'email', 'status', 'vehicle', 'plate', 'guarantor_name', 'guarantor_phone', 'review_note', 'online', 'deliveries'])
-            + ['has_documents' => (bool) ($r->id_photo_path && $r->selfie_path && $r->id_number)];
+            + ['has_documents' => (bool) ($r->id_photo_path && $r->selfie_path && $r->id_number), 'rating' => $r->ratingSummary()];
     }
 
     public function me(Request $request)

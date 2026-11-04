@@ -16,7 +16,7 @@ class Job extends Model
 
     protected $casts = [
         'rates' => 'array', 'paid_at' => 'datetime', 'assigned_at' => 'datetime', 'picked_up_at' => 'datetime',
-        'delivered_at' => 'datetime', 'closed_at' => 'datetime', 'distance_km' => 'float',
+        'delivered_at' => 'datetime', 'closed_at' => 'datetime', 'rated_at' => 'datetime', 'distance_km' => 'float',
         'goods_amount' => 'integer', 'delivery_fee' => 'integer', 'rider_share' => 'integer', 'goods_commission' => 'integer',
     ];
 

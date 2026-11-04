@@ -36,7 +36,7 @@ class AdminDispatchController extends Controller
     private function riderRow(Rider $r): array
     {
         return $r->only(['id', 'name', 'phone', 'email', 'status', 'vehicle', 'plate', 'guarantor_name', 'guarantor_phone', 'review_note', 'online', 'deliveries', 'last_seen_at', 'created_at'])
-            + ['has_documents' => (bool) ($r->id_photo_path && $r->selfie_path), 'id_number' => $r->id_number];
+            + ['has_documents' => (bool) ($r->id_photo_path && $r->selfie_path), 'id_number' => $r->id_number, 'rating' => $r->ratingSummary()];
     }
 
     public function riders(Request $request)
@@ -85,6 +85,15 @@ class AdminDispatchController extends Controller
         $url = fn (?string $path) => $path ? Storage::disk('media')->temporaryUrl($path, now()->addMinutes(10)) : null;
 
         return response()->json(['id_photo' => $url($r->id_photo_path), 'selfie' => $url($r->selfie_path)]);
+    }
+
+    /** What customers said about a rider, newest first. */
+    public function ratings(int $id)
+    {
+        $r = Rider::findOrFail($id);
+
+        return response()->json(['summary' => $r->ratingSummary(), 'data' => Job::with('tenant')->where('rider_id', $r->id)->whereNotNull('rating')->latest('rated_at')->limit(30)->get()
+            ->map(fn (Job $j) => ['code' => $j->code, 'shop' => $j->tenant?->name, 'rating' => $j->rating, 'comment' => $j->rating_comment, 'at' => $j->rated_at?->toIso8601String()])]);
     }
 
     // ------------------------------------------------------------------ jobs
