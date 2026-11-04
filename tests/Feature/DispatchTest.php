@@ -164,6 +164,22 @@ class DispatchTest extends TestCase
         $this->assertSame(4.0, (float) Product::withoutGlobalScopes()->find($this->product->id)->quantity, 'stock came off');
     }
 
+    public function test_a_failed_payment_attempt_gets_a_fresh_payment_next_time(): void
+    {
+        $order = $this->confirmed();
+        [$rider, $riderUser] = $this->activeRider();
+        Sanctum::actingAs($this->owner);
+        $jobId = $this->postJson("/api/v1/shop/orders/{$order->id}/rider")->json('id');
+        Sanctum::actingAs($riderUser);
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/accept")->assertOk();
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/pickup")->assertOk();
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/collect")->assertOk();
+        $this->payStatus = 'failed';
+        $this->getJson("/api/v1/rider/jobs/{$jobId}/payment")->assertJsonPath('pay_status', 'unpaid');
+        $this->postJson("/api/v1/rider/jobs/{$jobId}/collect")->assertOk();
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/v1/payment_intents') && $r->method() === 'POST' && $r['reference'] === 'job-'.Job::find($jobId)->code.'-2');
+    }
+
     public function test_wrong_codes_lock_out_after_a_few_tries(): void
     {
         $order = $this->confirmed();

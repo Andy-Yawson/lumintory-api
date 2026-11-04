@@ -213,11 +213,14 @@ class DispatchService
             ], fn ($s) => $s['amount'] > 0));
             $this->pay->ensureWallet($job->ownerWalletRef(), 'owner', $job->pickup_name);
             $this->pay->ensureWallet($rider->walletRef(), 'rider', $rider->name);
+            // A failed attempt is final in Pay, so each new attempt is its own payment with its own reference.
+            $attempt = (int) ($job->rates['pay_attempts'] ?? 0) + 1;
+            $reference = $attempt === 1 ? "job-{$job->code}" : "job-{$job->code}-{$attempt}";
             $intent = $this->pay->createPayment([
-                'amount' => $job->total(), 'description' => "{$job->pickup_name}: order #{$job->order->number} + delivery", 'reference' => "job-{$job->code}",
+                'amount' => $job->total(), 'description' => "{$job->pickup_name}: order #{$job->order->number} + delivery", 'reference' => $reference,
                 'product' => 'zinnvy-dispatch', 'splits' => $splits, 'metadata' => ['job' => $job->code, 'order' => $job->order->number],
-            ], "job-{$job->code}");
-            $job->update(['pay_intent_id' => $intent['id'], 'pay_checkout_url' => $intent['checkout_url'], 'pay_status' => 'pending']);
+            ], $reference);
+            $job->update(['pay_intent_id' => $intent['id'], 'pay_checkout_url' => $intent['checkout_url'], 'pay_status' => 'pending', 'rates' => ($job->rates ?? []) + ['pay_attempts' => $attempt]]);
         }
 
         return ['status' => 'pending', 'checkout_url' => $job->pay_checkout_url];
