@@ -20,6 +20,8 @@ return [
     // Where the browser lands after the backend finishes the OAuth
     // handshake and mints a short-lived handoff code.
     'frontend_callback_url' => env('ZINNVY_FRONTEND_CALLBACK_URL'),
+    // Where riders land after signing in (the rider app's own address). Falls back to the main app when unset.
+    'rider_callback_url' => env('ZINNVY_RIDER_CALLBACK_URL'),
 
     'scopes' => 'openid profile email',
 

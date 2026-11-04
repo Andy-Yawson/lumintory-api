@@ -29,7 +29,7 @@ class ZinnvyAuthController extends Controller
     {
         $state = Str::random(40);
         // `ref` (a referral code from /register?ref=…) rides along so a brand-new workspace can credit the referrer.
-        Cache::put("zinnvy_oauth_state:{$state}", ['ref' => $request->query('ref')], now()->addMinutes(30));
+        Cache::put("zinnvy_oauth_state:{$state}", ['ref' => $request->query('ref'), 'app' => $request->query('app') === 'rider' ? 'rider' : null], now()->addMinutes(30));
 
         $query = http_build_query([
             'client_id' => config('zinnvy.client_id'),
@@ -50,6 +50,10 @@ class ZinnvyAuthController extends Controller
         $stateData = $state ? Cache::pull("zinnvy_oauth_state:{$state}") : null;
         if (! $stateData) {
             return redirect("{$frontend}?error=invalid_state");
+        }
+        // Riders sign in from their own address (rider.zinnvy.com) and come back to it.
+        if (($stateData['app'] ?? null) === 'rider' && config('zinnvy.rider_callback_url')) {
+            $frontend = config('zinnvy.rider_callback_url');
         }
 
         $code = $request->query('code');
