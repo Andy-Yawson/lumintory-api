@@ -297,17 +297,25 @@ Route::middleware(['auth:sanctum', 'rider'])->prefix('v1/rider')->group(function
 // Delivery payments from Zinnvy Pay (signature only).
 Route::post('v1/webhooks/pay-dispatch', \App\Http\Controllers\Api\DispatchPayWebhookController::class)->middleware('throttle:300,1');
 
+// Dispatch staff routes. Mounted twice: for superadmins signed in here (v1/admin) and for the admin console's Identity staff (v1/staff).
+$dispatchStaff = function (array $writes) {
+    $c = \App\Http\Controllers\Api\Admin\AdminDispatchController::class;
+    Route::get('/dispatch/overview', [$c, 'overview']);
+    Route::get('/dispatch/riders', [$c, 'riders']);
+    Route::get('/dispatch/riders/{id}/documents', [$c, 'documents'])->whereNumber('id');
+    Route::get('/dispatch/jobs', [$c, 'jobs']);
+    Route::get('/dispatch/settings', [$c, 'settings']);
+    Route::middleware($writes)->group(function () use ($c) {
+        Route::post('/dispatch/riders', [$c, 'invite']);
+        Route::patch('/dispatch/riders/{id}', [$c, 'updateRider'])->whereNumber('id');
+        Route::post('/dispatch/jobs/{id}/assign', [$c, 'assign'])->whereNumber('id');
+        Route::put('/dispatch/settings', [$c, 'updateSettings']);
+    });
+};
+Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(fn () => $dispatchStaff([]));
+Route::middleware('identity.staff')->prefix('v1/staff')->group(fn () => $dispatchStaff(['identity.staff:superadmin']));
+
 Route::middleware(['auth:sanctum', 'superadmin'])->prefix('v1/admin')->group(function () {
-    // Dispatch: riders, jobs and the rules
-    Route::get('/dispatch/overview', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'overview']);
-    Route::get('/dispatch/riders', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'riders']);
-    Route::post('/dispatch/riders', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'invite']);
-    Route::patch('/dispatch/riders/{id}', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'updateRider'])->whereNumber('id');
-    Route::get('/dispatch/riders/{id}/documents', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'documents'])->whereNumber('id');
-    Route::get('/dispatch/jobs', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'jobs']);
-    Route::post('/dispatch/jobs/{id}/assign', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'assign'])->whereNumber('id');
-    Route::get('/dispatch/settings', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'settings']);
-    Route::put('/dispatch/settings', [\App\Http\Controllers\Api\Admin\AdminDispatchController::class, 'updateSettings']);
 
     // Tenants
     Route::get('/tenants', [AdminTenantController::class, 'index']);

@@ -251,4 +251,18 @@ class DispatchTest extends TestCase
         Sanctum::actingAs(User::where('email', 'new@rider.test')->first());
         $this->postJson('/api/v1/rider/online', ['online' => true])->assertForbidden();
     }
+
+    public function test_the_admin_console_reaches_dispatch_with_an_identity_staff_token(): void
+    {
+        config(['zinnvy.accounts_url' => 'https://accounts.test']);
+        Http::fake(['accounts.test/api/admin/me' => fn ($r) => $r->hasHeader('Authorization', 'Bearer staff-token')
+            ? Http::response(['id' => 's1', 'is_superadmin' => false]) : Http::response([], 401)] + [
+            'pay.test/*' => Http::response([]),
+        ]);
+        $this->getJson('/api/v1/staff/dispatch/overview')->assertStatus(401);
+        $this->getJson('/api/v1/staff/dispatch/overview', ['Authorization' => 'Bearer nope'])->assertStatus(401);
+        $this->getJson('/api/v1/staff/dispatch/overview', ['Authorization' => 'Bearer staff-token'])->assertOk()->assertJsonStructure(['riders', 'jobs']);
+        // Staff can look; only superadmins change commission.
+        $this->putJson('/api/v1/staff/dispatch/settings', ['rider_fee_percent' => 50], ['Authorization' => 'Bearer staff-token'])->assertStatus(403);
+    }
 }
