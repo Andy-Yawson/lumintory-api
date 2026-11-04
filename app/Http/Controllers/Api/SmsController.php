@@ -115,9 +115,11 @@ class SmsController extends Controller
     public function deliveryCallback(Request $request)
     {
         if (!$request->message_id)
-            return;
+            return response()->noContent();
 
-        SmsLog::where('provider_message_id', $request->message_id)
-            ->update(['status' => $request->status ?? 'delivered']);
+        // The provider reports many states ("buffered", "unknown"...); only translated ones are stored.
+        SmsLog::where('provider_message_id', $request->message_id)->get()->each(fn (SmsLog $log) => $log->applyDeliveryReport($request->status ?? 'delivered'));
+
+        return response()->noContent();
     }
 }
