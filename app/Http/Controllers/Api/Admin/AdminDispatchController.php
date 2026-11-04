@@ -48,13 +48,17 @@ class AdminDispatchController extends Controller
 
     public function invite(Request $request)
     {
-        $data = $request->validate(['name' => 'required|string|max:80', 'phone' => 'required|string|max:20', 'email' => 'required|email|max:120|unique:dispatch_riders,email|unique:users,email']);
+        $data = $request->validate(['name' => 'required|string|max:80', 'phone' => 'required|string|max:20', 'email' => 'required|email|max:120|unique:dispatch_riders,email']);
         $tenantId = Settings::get('platform_tenant_id');
         abort_unless($tenantId, 422, 'Run dispatch:setup first.');
 
-        $user = new User(['name' => $data['name'], 'email' => $data['email'], 'password' => Str::random(40), 'role' => 'Rider', 'first_login' => true]);
-        $user->tenant_id = $tenantId;
-        $user->save();
+        // Someone who already has a Zinnvy Inventory login (a shop owner) keeps it and simply gains rider access.
+        $user = User::where('email', $data['email'])->first();
+        if (! $user) {
+            $user = new User(['name' => $data['name'], 'email' => $data['email'], 'password' => Str::random(40), 'role' => 'Rider', 'first_login' => true]);
+            $user->tenant_id = $tenantId;
+            $user->save();
+        }
         $rider = Rider::create(['user_id' => $user->id, 'name' => $data['name'], 'phone' => $data['phone'], 'email' => $data['email'], 'status' => 'invited']);
 
         $link = rtrim((string) config('services.frontend_url'), '/').'/rider/';

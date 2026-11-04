@@ -12,9 +12,11 @@ class EnsureRider
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        abort_unless($user && strtolower((string) $user->role) === 'rider', 403, 'This area is for Zinnvy riders.');
+        abort_unless($user, 401);
+        // A rider is whoever has a rider record: a shop owner can also ride, with the same Zinnvy account.
         $rider = Rider::where('user_id', $user->id)->first();
-        abort_unless($rider && $rider->status !== 'suspended' && $rider->status !== 'rejected', 403, 'Your rider account is not active. Contact Zinnvy.');
+        abort_unless($rider, 403, 'Create your rider account first.');
+        abort_if($rider->status === 'suspended', 403, 'Your rider account is paused. Contact Zinnvy.');
         $request->attributes->set('rider', $rider);
 
         return $next($request);

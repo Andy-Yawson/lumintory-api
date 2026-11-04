@@ -29,6 +29,33 @@ class RiderController extends Controller
             + ['has_documents' => (bool) ($r->id_photo_path && $r->selfie_path && $r->id_number), 'rating' => $r->ratingSummary()];
     }
 
+    /** Who am I on the rider app: a rider record, or "not registered yet" for any signed-in Zinnvy account. */
+    public function profile(Request $request)
+    {
+        $user = $request->user();
+        $rider = Rider::where('user_id', $user->id)->first();
+
+        return response()->json($rider ? self::payload($rider) + ['registered' => true] : ['registered' => false, 'name' => $user->name, 'email' => $user->email]);
+    }
+
+    /** Create my rider account. Staff approve it (after checking documents) before I can ride. */
+    public function register(Request $request)
+    {
+        $user = $request->user();
+        $data = $request->validate(['phone' => 'required|string|min:9|max:20']);
+        $rider = Rider::where('user_id', $user->id)->first() ?? Rider::where('email', $user->email)->first();
+        if ($rider) {
+            if ($rider->user_id !== $user->id && $rider->user_id !== null) {
+                return response()->json(['message' => 'That rider account belongs to another sign-in. Contact Zinnvy.'], 409);
+            }
+            $rider->update(['user_id' => $user->id]);   // staff had already invited this email
+        } else {
+            $rider = Rider::create(['user_id' => $user->id, 'name' => $user->name, 'phone' => $data['phone'], 'email' => $user->email, 'status' => 'invited']);
+        }
+
+        return response()->json(self::payload($rider) + ['registered' => true], 201);
+    }
+
     public function me(Request $request)
     {
         return response()->json(self::payload($this->rider($request)));

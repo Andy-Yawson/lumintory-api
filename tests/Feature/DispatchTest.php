@@ -282,6 +282,40 @@ class DispatchTest extends TestCase
         $this->getJson('/api/v1/wallet/statement')->assertForbidden();
     }
 
+    public function test_a_shop_owner_can_also_become_a_rider_with_the_same_account(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $this->getJson('/api/v1/rider/me')->assertOk()->assertJsonPath('registered', false);
+        $this->getJson('/api/v1/rider/jobs')->assertForbidden();   // not a rider until they register
+        $this->postJson('/api/v1/rider/register', ['phone' => '0244111222'])->assertCreated()->assertJsonPath('status', 'invited')->assertJsonPath('registered', true);
+        $this->postJson('/api/v1/rider/register', ['phone' => '0244111222'])->assertCreated();   // safe to repeat
+        $this->assertSame(1, Rider::where('user_id', $this->owner->id)->count());
+        $this->getJson('/api/v1/rider/me')->assertJsonPath('registered', true)->assertJsonPath('rating.count', 0);
+        $this->postJson('/api/v1/rider/online', ['online' => true])->assertForbidden();   // still needs approval
+        $this->assertSame('Administrator', $this->owner->fresh()->role, 'their shop role is untouched');
+    }
+
+    public function test_a_brand_new_zinnvy_account_gets_a_rider_login_not_a_shop_workspace(): void
+    {
+        \Illuminate\Support\Facades\Cache::put('zinnvy_rider_signup:abc123', ['sub' => 'sub-new', 'email' => 'new.rider@example.test', 'name' => 'New Rider'], now()->addMinutes(5));
+        $r = $this->postJson('/api/v1/auth/zinnvy/rider-signup', ['code' => 'abc123'])->assertCreated();
+        $this->assertSame('Rider', $r->json('user.role'));
+        $this->assertSame((int) \App\Services\Dispatch\Settings::get('platform_tenant_id'), (int) User::where('email', 'new.rider@example.test')->value('tenant_id'));
+        $this->assertSame(0, Tenant::where('name', 'New Rider')->count(), 'no shop workspace was created');
+        $this->postJson('/api/v1/auth/zinnvy/rider-signup', ['code' => 'abc123'])->assertStatus(404);   // one use
+        $token = $r->json('token');
+        $this->withHeader('Authorization', 'Bearer '.$token)->postJson('/api/v1/rider/register', ['phone' => '0244999888'])->assertCreated();
+    }
+
+    public function test_staff_can_invite_a_rider_who_already_has_an_account(): void
+    {
+        $admin = User::factory()->create(['tenant_id' => $this->tenant->id, 'role' => 'superadmin']);
+        Sanctum::actingAs($admin);
+        $this->postJson('/api/v1/admin/dispatch/riders', ['name' => 'Akosua', 'phone' => '0277000999', 'email' => $this->owner->email])->assertCreated();
+        $this->assertSame('Administrator', $this->owner->fresh()->role);
+        $this->assertSame($this->owner->id, Rider::where('email', $this->owner->email)->value('user_id'));
+    }
+
     public function test_wrong_codes_lock_out_after_a_few_tries(): void
     {
         $order = $this->confirmed();

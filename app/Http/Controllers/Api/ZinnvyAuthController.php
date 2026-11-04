@@ -101,15 +101,19 @@ class ZinnvyAuthController extends Controller
             }
         }
 
-        // The riders' own address only signs in invited riders: never offer them a shop workspace.
-        if (($stateData['app'] ?? null) === 'rider' && (! $user || strtolower((string) $user->role) !== 'rider')) {
-            return redirect("{$frontend}?error=not_a_rider");
-        }
-
         if (! $user && ! $emailVerified) {
             // Never link an invite, and never create a workspace, on an email Zinnvy hasn't verified:
             // that would let someone claim an address they don't own.
             return redirect("{$frontend}?error=email_unverified&email=".urlencode($email));
+        }
+
+        $isRiderApp = ($stateData['app'] ?? null) === 'rider';
+        if (! $user && $isRiderApp) {
+            // Someone new on the riders' own address: never a shop workspace, a rider account (approved by Zinnvy before they ride).
+            $code = Str::random(40);
+            Cache::put("zinnvy_rider_signup:{$code}", ['sub' => $sub, 'email' => $email, 'name' => $claims['name'] ?? ($claims['given_name'] ?? Str::before($email, '@'))], now()->addMinutes(30));
+
+            return redirect("{$frontend}?rider_signup={$code}");
         }
 
         if (! $user) {
@@ -125,7 +129,8 @@ class ZinnvyAuthController extends Controller
             return redirect("{$frontend}?signup={$code}");
         }
 
-        if (! $user->tenant->is_active) {
+        // A shop owner who also rides is signed in to the rider app even if their shop workspace is paused.
+        if (! $isRiderApp && ! $user->tenant->is_active) {
             return redirect("{$frontend}?error=subscription_inactive");
         }
 
@@ -171,6 +176,28 @@ class ZinnvyAuthController extends Controller
             'expires_in' => $payload['expires_in'] ?? null,
             'success' => true,
         ]);
+    }
+
+    /** A brand-new Zinnvy account creating its rider login (not a shop workspace). Then the app collects their details at /rider/register. */
+    public function riderSignup(Request $request)
+    {
+        $data = $request->validate(['code' => ['required', 'string']]);
+        $payload = Cache::pull("zinnvy_rider_signup:{$data['code']}");
+        if (! $payload) {
+            return response()->json(['success' => false, 'message' => 'This sign-up link has expired. Please start again.'], 404);
+        }
+        $tenantId = \App\Services\Dispatch\Settings::get('platform_tenant_id');
+        abort_unless($tenantId, 503, 'Rider sign-up is not switched on yet.');
+        if (User::where('zinnvy_sub', $payload['sub'])->orWhere('email', $payload['email'])->exists()) {
+            return response()->json(['success' => false, 'message' => 'This Zinnvy account is already registered. Sign in instead.'], 409);
+        }
+
+        $user = new User(['name' => $payload['name'], 'email' => $payload['email'], 'password' => Str::random(40), 'role' => 'Rider', 'first_login' => false, 'zinnvy_sub' => $payload['sub']]);
+        $user->tenant_id = $tenantId;
+        $user->save();
+        $session = AuthSessions::issue($user, userAgent: $request->userAgent());
+
+        return response()->json(['success' => true, 'user' => $user] + $session, 201);
     }
 
     /** Who is signing up (shown on the "name your workspace" step). Does not consume the code. */

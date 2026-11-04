@@ -48,6 +48,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/v1/auth/zinnvy/redirect', [ZinnvyAuthController::class, 'redirect']);
 Route::get('/v1/auth/zinnvy/callback', [ZinnvyAuthController::class, 'callback']);
 Route::post('/v1/auth/zinnvy/handoff', [ZinnvyAuthController::class, 'handoff'])->middleware('throttle:10,1');
+Route::post('/v1/auth/zinnvy/rider-signup', [ZinnvyAuthController::class, 'riderSignup'])->middleware('throttle:10,1');
 Route::get('/v1/auth/zinnvy/signup/{code}', [ZinnvyAuthController::class, 'signupInfo'])->middleware('throttle:20,1');
 Route::post('/v1/auth/zinnvy/signup', [ZinnvyAuthController::class, 'completeSignup'])->middleware('throttle:10,1');
 
@@ -276,9 +277,13 @@ Route::prefix('v1/integrations')->middleware('integration.auth')->group(function
 
 
 // Riders' phone app: Zinnvy riders only.
+Route::middleware('auth:sanctum')->prefix('v1/rider')->group(function () {
+    $c = \App\Http\Controllers\Api\RiderController::class;
+    Route::get('/me', [$c, 'profile']);
+    Route::post('/register', [$c, 'register'])->middleware('throttle:10,1');
+});
 Route::middleware(['auth:sanctum', 'rider'])->prefix('v1/rider')->group(function () {
     $c = \App\Http\Controllers\Api\RiderController::class;
-    Route::get('/me', [$c, 'me']);
     Route::post('/onboarding', [$c, 'onboard']);
     Route::post('/online', [$c, 'online']);
     Route::get('/jobs', [$c, 'jobs']);
