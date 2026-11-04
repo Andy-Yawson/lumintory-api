@@ -258,7 +258,7 @@ class ShopController extends Controller
 
         $job = \App\Models\Dispatch\Job::with('rider')->where('shop_order_id', $order->id)->latest('id')->first();
 
-        return response()->json($order->toArray() + ['phone_blocked' => $shop->isBlocked($order->customer_phone), 'delivery_job' => $job ? \App\Http\Controllers\Api\DispatchOwnerController::jobPayload($job) : null]);
+        return response()->json($order->toArray() + ['phone_blocked' => $shop->isBlocked($order->customer_phone), 'rider_delivery_on' => (bool) ($shop->rider_delivery && $shop->pickup_lat !== null), 'delivery_job' => $job ? \App\Http\Controllers\Api\DispatchOwnerController::jobPayload($job) : null]);
     }
 
     public function updateOrder(Request $request, int $id)
