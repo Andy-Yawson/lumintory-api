@@ -30,7 +30,7 @@ class SMSCreditRemainder extends Command
         }
 
         foreach (['yawsonandrews@gmail.com', 'ugin.dev@gmail.com'] as $email) {
-            MailHelper::sendEmailNotification($email, 'SMS provider balance is low', "The SMS provider balance is now {$balance}. Top it up so customer messages keep sending.");
+            MailHelper::sendEmailNotification($email, 'SMS provider balance is low', "[[note: The SMS provider balance is now {$balance}. Top it up so customer messages keep sending.]]", ['product' => 'Operations']);
         }
     }
 }

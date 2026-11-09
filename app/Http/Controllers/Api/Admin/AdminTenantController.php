@@ -95,17 +95,17 @@ class AdminTenantController extends Controller
 
         if (isset($validated['plan'])) {
             $tenant->plan = $validated['plan'];
-            MailHelper::sendEmailNotification($tenantAdmin->email, 'Plan Updated', 'Your plan has been updated to ' . $validated['plan']);
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Your plan was updated', "Your Zinnvy Inventory plan is now **".ucfirst($validated['plan']).'**.', ['reason' => "You got this because you administer {$tenant->name} on Zinnvy Inventory."]);
         }
 
         if (isset($validated['is_active'])) {
             $tenant->is_active = $validated['is_active'];
-            MailHelper::sendEmailNotification($tenantAdmin->email, 'Account Status Updated', 'Your account status has been updated to ' . ($validated['is_active'] ? 'Active' : 'Inactive'));
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Your account status changed', 'Your Zinnvy Inventory account is now **'.($validated['is_active'] ? 'active' : 'inactive').'**.'.($validated['is_active'] ? '' : "\n\nIf you think this is a mistake, contact support@zinnvy.com."), ['reason' => "You got this because you administer {$tenant->name} on Zinnvy Inventory."]);
         }
 
         if (isset($validated['subscription_ends_at'])) {
             $tenant->subscription_ends_at = Carbon::parse($validated['subscription_ends_at']);
-            MailHelper::sendEmailNotification($tenantAdmin->email, 'Subscription Ends At Updated', 'Your subscription ends at has been updated to ' . $validated['subscription_ends_at']);
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Your subscription end date changed', 'Your subscription now runs until **'.Carbon::parse($validated['subscription_ends_at'])->format('j F Y').'**.', ['reason' => "You got this because you administer {$tenant->name} on Zinnvy Inventory."]);
         }
 
         $tenant->save();

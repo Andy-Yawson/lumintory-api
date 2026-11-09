@@ -238,9 +238,10 @@ class AuthController extends Controller
             $user->email,
             "{$inviter->name} invited you to {$workspace} on Zinnvy Inventory",
             "Hi {$user->name},\n\n{$inviter->name} added you to {$workspace} as " . ($user->role === 'Administrator' ? 'an Administrator' : 'a Sales user') . ".\n\n"
-            . "To get in, open {$loginUrl} and choose \"Continue with Zinnvy\", signing in with this email address ({$user->email}).\n"
-            . "Don't have a Zinnvy account yet? Create one free at https://accounts.zinnvy.com using this same email, verify it, then come back and sign in.\n\n"
-            . "Regards,\nZinnvy."
+            . "[[button: Open Zinnvy Inventory | {$loginUrl}]]\n\n"
+            . "Choose \"Continue with Zinnvy\" and sign in with this email address ({$user->email}).\n\n"
+            . "[[note: Don't have a Zinnvy account yet? Create one free at https://accounts.zinnvy.com using this same email, verify it, then come back and sign in.]]",
+            ['reason' => "You got this because {$inviter->name} added you to {$workspace}."]
         );
     }
 
@@ -313,7 +314,7 @@ class AuthController extends Controller
 
         $subject = 'Zinnvy Contact Us: ' . $validated['name'] . ' (' . $validated['email'] . ')';
         foreach (['yawsonandrews@gmail.com', 'ugin.dev@gmail.com'] as $email) {
-            MailHelper::sendEmailNotification($email, $subject, $validated['message']);
+            MailHelper::sendEmailNotification($email, $subject, "From: {$validated['name']}\nReply to: {$validated['email']}\n\n{$validated['message']}", ['title' => 'New message from the contact form']);
         }
 
         return response()->json([
