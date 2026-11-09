@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Mail;
+
 /**
  * Turns an email's plain-text body into the standard Zinnvy HTML email (see zinnvy.blade.php) plus a clean text alternative.
  * Existing call sites keep passing plain text: paragraphs, "- " lists, "Label: value" blocks and "Open the order: https://..." lines
@@ -12,6 +14,19 @@ namespace App\Support;
 final class ZinnvyMail
 {
     private const BUTTON_LINE = '/^(Open|View|Track|Review|Confirm|Reset|Sign in|Go to|Pay|Accept|Verify|Download|Get started)[^:\n]{0,50}:\s*(https?:\/\/\S+)$/i';
+
+    /**
+     * Sends a standard Zinnvy email right away (use inside a queued job if you need it queued). $to is an address or a list of them.
+     *
+     * @param  array{product?: string, from?: ?string, title?: ?string, preheader?: ?string, reason?: ?string}  $options
+     */
+    public static function send(string|array $to, string $subject, string $body, array $options = []): void
+    {
+        Mail::send([], [], function ($message) use ($to, $subject, $body, $options) {
+            $logo = $message->embed(resource_path('email/zinnvy-mark.png'));
+            $message->to($to)->subject($subject)->html(self::html($subject, $body, $options, $logo))->text(self::text($subject, $body, $options));
+        });
+    }
 
     /** @param  array{product?: string, from?: ?string, title?: ?string, preheader?: ?string, reason?: ?string}  $o */
     public static function html(string $subject, string $body, array $o, string $logo): string
@@ -69,6 +84,7 @@ final class ZinnvyMail
                         $blocks[] = ['type' => 'note', 'html' => self::inline($m[1])];
                     }
                 }
+
                 continue;
             }
 
@@ -78,11 +94,13 @@ final class ZinnvyMail
                     preg_match(self::BUTTON_LINE, $l, $m);
                     $blocks[] = ['type' => 'button', 'label' => trim(explode(':', $l, 2)[0]), 'url' => $m[2]];
                 }
+
                 continue;
             }
 
             if (count(array_filter($lines, fn ($l) => preg_match('/^[-•*]\s+/', $l))) === count($lines)) {
                 $blocks[] = ['type' => 'ul', 'items' => array_map(fn ($l) => self::inline(preg_replace('/^[-•*]\s+/', '', $l)), $lines)];
+
                 continue;
             }
 
@@ -95,6 +113,7 @@ final class ZinnvyMail
             }
             if (count($rows) >= 2 && count($rows) === count($lines)) {
                 $blocks[] = ['type' => 'kv', 'rows' => $rows];
+
                 continue;
             }
 
