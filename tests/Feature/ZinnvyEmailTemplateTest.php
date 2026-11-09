@@ -60,6 +60,6 @@ class ZinnvyEmailTemplateTest extends TestCase
         $this->assertStringContainsString('Open it: https://x.test/a', $text);
         $this->assertStringContainsString('Careful.', $text);
         $this->assertStringNotContainsString('[[', $text);
-        $this->assertStringContainsString('support@zinnvy.com', $text);
+        $this->assertStringContainsString('support@zinnvytech.com', $text);
     }
 }

@@ -100,7 +100,7 @@ class AdminTenantController extends Controller
 
         if (isset($validated['is_active'])) {
             $tenant->is_active = $validated['is_active'];
-            MailHelper::sendEmailNotification($tenantAdmin->email, 'Your account status changed', 'Your Zinnvy Inventory account is now **'.($validated['is_active'] ? 'active' : 'inactive').'**.'.($validated['is_active'] ? '' : "\n\nIf you think this is a mistake, contact support@zinnvy.com."), ['reason' => "You got this because you administer {$tenant->name} on Zinnvy Inventory."]);
+            MailHelper::sendEmailNotification($tenantAdmin->email, 'Your account status changed', 'Your Zinnvy Inventory account is now **'.($validated['is_active'] ? 'active' : 'inactive').'**.'.($validated['is_active'] ? '' : "\n\nIf you think this is a mistake, contact support@zinnvytech.com."), ['reason' => "You got this because you administer {$tenant->name} on Zinnvy Inventory."]);
         }
 
         if (isset($validated['subscription_ends_at'])) {
