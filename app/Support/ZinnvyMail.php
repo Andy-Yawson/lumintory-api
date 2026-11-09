@@ -50,7 +50,7 @@ final class ZinnvyMail
         $clean = preg_replace('/\[\[button:\s*(.*?)\s*\|\s*(.*?)\s*\]\]/i', '$1: $2', $clean);
         $clean = preg_replace('/\[\[note:\s*(.*?)\s*\]\]/i', '$1', $clean);
 
-        return trim($clean)."\n\n— Zinnvy ".($o['product'] ?? 'Inventory').($o['reason'] ?? null ? "\n".$o['reason'] : '')."\nzinnvy.com · support@zinnvy.com\n";
+        return trim($clean)."\n\n— Zinnvy ".($o['product'] ?? 'Inventory').($o['reason'] ?? null ? "\n".$o['reason'] : '')."\nzinnvy.com · support@zinnvytech.com\n";
     }
 
     /** Drops the old hand-written sign-off ("Regards, Zinnvy."): the layout has a footer. */

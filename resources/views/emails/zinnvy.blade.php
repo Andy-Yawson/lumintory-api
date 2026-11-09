@@ -54,7 +54,7 @@
     <tr><td style="padding:20px 10px 0 10px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:19px;color:#7d8a83;text-align:center;">
       @if (!empty($reason))<p style="margin:0 0 8px 0;">{{ $reason }}</p>@endif
       <p style="margin:0;">Sent by <a href="https://zinnvy.com" style="color:#1f5a45;text-decoration:none;font-weight:600;">Zinnvy</a>, a product of Zinnvytech, Accra, Ghana.<br>
-      Need help? <a href="mailto:support@zinnvy.com" style="color:#1f5a45;text-decoration:none;">support@zinnvy.com</a></p>
+      Need help? <a href="mailto:support@zinnvytech.com" style="color:#1f5a45;text-decoration:none;">support@zinnvytech.com</a></p>
     </td></tr>
   </table>
 </td></tr>
