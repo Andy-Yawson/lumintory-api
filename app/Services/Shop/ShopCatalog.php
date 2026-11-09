@@ -33,7 +33,7 @@ class ShopCatalog
             'pickup' => $shop->pickup,
             'delivery' => $shop->delivery,
             'delivery_note' => $shop->delivery_note,
-            'rider_delivery' => (bool) ($shop->rider_delivery && $shop->pickup_lat !== null),
+            'rider_delivery' => (bool) ($shop->rider_delivery && $shop->pickup_lat !== null && \App\Services\Pay\DispatchPay::configured()),
             // The details themselves are only revealed after an order is placed.
             'accepts_momo' => (bool) $shop->momo(),
             'takes_bookings' => $shop->bookings_enabled && \App\Models\ShopService::withoutGlobalScopes()->where('shop_id', $shop->id)->where('active', true)->exists(),

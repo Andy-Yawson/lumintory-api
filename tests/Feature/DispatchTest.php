@@ -316,6 +316,14 @@ class DispatchTest extends TestCase
         $this->assertSame($this->owner->id, Rider::where('email', $this->owner->email)->value('user_id'));
     }
 
+    public function test_rider_delivery_cannot_be_switched_on_until_payments_are_connected(): void
+    {
+        config(['services.pay_dispatch.secret_key' => null]);
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/shop', ['rider_delivery' => true])->assertStatus(422)->assertJsonPath('errors.rider_delivery.0', 'Zinnvy rider delivery is not available yet.');
+        $this->assertFalse((bool) $this->getJson('/api/v1/public/shops/akosua')->json('rider_delivery'), 'customers are not offered it either');
+    }
+
     public function test_wrong_codes_lock_out_after_a_few_tries(): void
     {
         $order = $this->confirmed();

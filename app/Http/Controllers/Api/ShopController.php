@@ -107,6 +107,9 @@ class ShopController extends Controller
         if (($data['enabled'] ?? false) && ! Shop::tenantQualifies($shop->tenant)) {
             return response()->json(['message' => 'The online shop is part of the Pro plan. Upgrade to switch it on.'], 403);
         }
+        if (($data['rider_delivery'] ?? false) && ! \App\Services\Pay\DispatchPay::configured()) {
+            return response()->json(['message' => 'Zinnvy rider delivery is not available yet. We will let you know when it is.', 'errors' => ['rider_delivery' => ['Zinnvy rider delivery is not available yet.']]], 422);
+        }
         if ($data['rider_delivery'] ?? false) {
             $lat = $data['pickup_lat'] ?? $shop->pickup_lat;
             $lng = $data['pickup_lng'] ?? $shop->pickup_lng;
