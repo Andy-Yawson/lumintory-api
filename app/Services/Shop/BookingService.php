@@ -127,9 +127,9 @@ class BookingService
         $body = "New booking request B-{$b->number}: {$b->service_name}\n\nWhen: ".self::when($b)." ({$b->duration_minutes} min)\n{$where}\n"
             ."Customer: {$b->customer_name}, {$b->customer_phone}\n"
             .($b->for_product ? "For: {$b->for_product}\n" : '').($b->note ? "Note: {$b->note}\n" : '')
-            ."\nConfirm or decline it here: {$link}\nThe customer gets a text as soon as you do.\n\nZinnvy.";
+            ."\n[[button: Confirm or decline | {$link}]]\n\nThe customer gets a text as soon as you do.";
         rescue(fn () => User::where('tenant_id', $tenant->id)->where('role', 'Administrator')->pluck('email')
-            ->each(fn ($e) => MailHelper::sendEmailNotification($e, "Booking request: {$b->service_name}, ".self::when($b), $body)), report: true);
+            ->each(fn ($e) => MailHelper::sendEmailNotification($e, "Booking request: {$b->service_name}, ".self::when($b), $body, ['reason' => "You get this because you manage {$tenant->name} on Zinnvy Inventory."])), report: true);
 
         $sms = app(SmsService::class);
         if ($to = $shop->notify_phone ?: $shop->whatsapp) {
@@ -157,7 +157,7 @@ class BookingService
         };
         rescue(fn () => app(SmsService::class)->queueSms($b->tenant_id, 'Zinnvy', $b->customer_phone, $text), report: true);
         if ($b->customer_email) {
-            rescue(fn () => MailHelper::sendEmailNotification($b->customer_email, "Your booking with {$name}", "Hi {$b->customer_name},\n\n{$text}\n\nPowered by Zinnvy."), report: true);
+            rescue(fn () => MailHelper::sendEmailNotification($b->customer_email, "Your booking with {$name}", "Hi {$b->customer_name},\n\n{$text}", ['from' => $name, 'title' => "Your booking with {$name}", 'reason' => "You got this email because you booked with {$name}. Their shop runs on Zinnvy."]), report: true);
         }
     }
 }

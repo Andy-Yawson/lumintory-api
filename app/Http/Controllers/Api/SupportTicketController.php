@@ -64,7 +64,7 @@ class SupportTicketController extends Controller
         // dispatch notification to internal support email/Slack
         $admins = User::where('role', 'SuperAdmin')->get();
         foreach ($admins as $admin) {
-            MailHelper::sendEmailNotification($admin->email, 'New Support Ticket', 'A new support ticket has been created: ' . $ticket->subject);
+            MailHelper::sendEmailNotification($admin->email, 'New support ticket', "A new support ticket was created.\n\nSubject: {$ticket->subject}\nFrom: {$user->name} ({$user->email})");
         }
 
         return response()->json(['success' => true, 'ticket' => $ticket], 201);

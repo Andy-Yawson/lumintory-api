@@ -75,7 +75,7 @@ class WorkspaceProvisioner
         });
 
         foreach (['yawsonandrews@gmail.com', 'ugin.dev@gmail.com'] as $email) {
-            MailHelper::sendEmailNotification($email, "New tenant signed up: {$result['tenant']->name}", "You have one new tenant registered.\n \n\nRegards,\nZinnvy.");
+            MailHelper::sendEmailNotification($email, "New tenant signed up: {$result['tenant']->name}", "A new workspace was created on Zinnvy Inventory.\n\nWorkspace: {$result['tenant']->name}\nOwner: {$data['email']}", ['product' => 'Operations']);
         }
 
         return $result;

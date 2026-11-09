@@ -134,10 +134,10 @@ class ShopOrderService
                 .($order->note ? "Note: {$order->note}\n" : '')
                 .(self::sourceLabel($order->source) ? 'Came from: '.self::sourceLabel($order->source)."\n" : '')
                 ."\n{$items}\n\nTotal: ".$money($order->subtotal)."\n\n"
-                ."Chat on WhatsApp: {$wa}\nOpen the order: {$dashboard}\n\n"
-                ."No payment has been taken. Contact the customer to confirm.\n\nZinnvy.";
+                ."[[button: Open the order | {$dashboard}]]\n[[button: Chat with the customer on WhatsApp | {$wa}]]\n\n"
+                ."[[note: No payment has been taken. Contact the customer to confirm.]]";
             User::where('tenant_id', $tenant->id)->where('role', 'Administrator')->pluck('email')
-                ->each(fn ($email) => MailHelper::sendEmailNotification($email, "New order #{$order->number}: {$order->customer_name}, ".$money($order->subtotal), $body));
+                ->each(fn ($email) => MailHelper::sendEmailNotification($email, "New order #{$order->number}: {$order->customer_name}, ".$money($order->subtotal), $body, ['reason' => "You get this because you manage {$tenant->name} on Zinnvy Inventory."]));
         }, report: true);
 
         $sms = app(SmsService::class);
@@ -154,11 +154,11 @@ class ShopOrderService
             .($payLine ? " After they confirm, pay by {$payLine}" : '')), report: true);
         if ($order->customer_email) {
             rescue(fn () => MailHelper::sendEmailNotification($order->customer_email, "Your order #{$order->number} at {$tenant->name}",
-                "Hi {$order->customer_name},\n\n{$tenant->name} received your order #{$order->number}:\n\n{$items}\n\nTotal: ".$money($order->subtotal)
-                ."\n\nNo payment has been taken. {$tenant->name} will contact you on {$order->customer_phone} to confirm the order and arrange "
+                "Hi {$order->customer_name},\n\n{$tenant->name} received your order #{$order->number}:\n\n{$items}\n\n**Total: ".$money($order->subtotal)
+                ."**\n\nNo payment has been taken. {$tenant->name} will contact you on {$order->customer_phone} to confirm the order and arrange "
                 .($order->fulfilment === 'delivery' ? 'delivery' : 'pickup').'.'
                 .($payLine ? "\n\nOnce they confirm, you can pay by {$payLine}\nOnly pay after {$tenant->name} has confirmed your order." : '')
-                ."\n\nPowered by Zinnvy."), report: true);
+                , ['from' => $tenant->name, 'title' => "We got your order #{$order->number}", 'reason' => "You got this email because you placed an order with {$tenant->name}. Their shop runs on Zinnvy."]), report: true);
         }
     }
 

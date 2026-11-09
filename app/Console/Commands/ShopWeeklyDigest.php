@@ -40,7 +40,7 @@ class ShopWeeklyDigest extends Command
                 .($topProduct && $topProduct['views'] ? "Most viewed: {$topProduct['name']} ({$topProduct['views']} views)\n" : '')
                 .($topSource ? 'Top source: '.($names[$topSource['source']] ?? $topSource['source'])." ({$topSource['visitors']} visitors)\n" : '')
                 ."\n".collect($data['highlights'])->map(fn ($h) => '- '.$h['text'])->implode("\n")
-                ."\n\nSee the full picture: {$link}\n\nZinnvy.";
+                ."\n\n[[button: See the full picture | {$link}]]";
 
             User::where('tenant_id', $shop->tenant_id)->where('role', 'Administrator')->pluck('email')
                 ->each(function ($email) use ($body, $t, &$sent) {

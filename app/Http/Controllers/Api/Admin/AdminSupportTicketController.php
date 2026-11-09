@@ -74,7 +74,7 @@ class AdminSupportTicketController extends Controller
 
         // notify ticket owner
         $tenantAdmin = User::where('tenant_id', $ticket->tenant_id)->where('role', 'Administrator')->first();
-        MailHelper::sendEmailNotification($tenantAdmin->email, 'Support Ticket Status Updated', 'You have received a new message on your support ticket: ' . $ticket->subject);
+        MailHelper::sendEmailNotification($tenantAdmin->email, 'New reply on your support ticket', "Zinnvy support replied to your ticket.\n\n**{$ticket->subject}**\n\n[[button: Open the ticket | ".rtrim((string) config('services.frontend_url'), '/')."/dashboard/support-tickets/]]");
 
         return response()->json([
             'success' => true,
@@ -117,7 +117,7 @@ class AdminSupportTicketController extends Controller
         ]);
 
         $tenantAdmin = User::where('tenant_id', $ticket->tenant_id)->where('role', 'Administrator')->first();
-        MailHelper::sendEmailNotification($tenantAdmin->email, 'Support Ticket Status Updated', 'The status of your support ticket has been updated to ' . $data['status']);
+        MailHelper::sendEmailNotification($tenantAdmin->email, 'Your support ticket was updated', "The status of your support ticket is now **{$data['status']}**.\n\n[[button: Open the ticket | ".rtrim((string) config('services.frontend_url'), '/')."/dashboard/support-tickets/]]");
 
         return response()->json([
             'success' => true,
