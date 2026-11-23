@@ -22,6 +22,9 @@ return [
     'frontend_callback_url' => env('ZINNVY_FRONTEND_CALLBACK_URL'),
     // Where riders land after signing in (the rider app's own address). Falls back to the main app when unset.
     'rider_callback_url' => env('ZINNVY_RIDER_CALLBACK_URL'),
+    // The rider app's own Identity client, so the consent screen says "Zinnvy Rider". Falls back to the main client.
+    'rider_client_id' => env('ZINNVY_RIDER_CLIENT_ID'),
+    'rider_client_secret' => env('ZINNVY_RIDER_CLIENT_SECRET'),
 
     'scopes' => 'openid profile email',
 

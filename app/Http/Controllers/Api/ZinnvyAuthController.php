@@ -32,7 +32,7 @@ class ZinnvyAuthController extends Controller
         Cache::put("zinnvy_oauth_state:{$state}", ['ref' => $request->query('ref'), 'app' => $request->query('app') === 'rider' ? 'rider' : null], now()->addMinutes(30));
 
         $query = http_build_query([
-            'client_id' => config('zinnvy.client_id'),
+            'client_id' => $this->client($request->query('app') === 'rider')[0],
             'redirect_uri' => config('zinnvy.redirect_uri'),
             'response_type' => 'code',
             'scope' => config('zinnvy.scopes'),
@@ -40,6 +40,16 @@ class ZinnvyAuthController extends Controller
         ]);
 
         return redirect(config('zinnvy.accounts_url')."/oauth/authorize?{$query}");
+    }
+
+    /** [client id, secret]: the rider app's own client when configured, so Identity names the right app. */
+    private function client(bool $rider): array
+    {
+        if ($rider && config('zinnvy.rider_client_id') && config('zinnvy.rider_client_secret')) {
+            return [config('zinnvy.rider_client_id'), config('zinnvy.rider_client_secret')];
+        }
+
+        return [config('zinnvy.client_id'), config('zinnvy.client_secret')];
     }
 
     public function callback(Request $request)
@@ -63,8 +73,8 @@ class ZinnvyAuthController extends Controller
 
         $tokenResponse = Http::asForm()->post(config('zinnvy.accounts_url').'/oauth/token', [
             'grant_type' => 'authorization_code',
-            'client_id' => config('zinnvy.client_id'),
-            'client_secret' => config('zinnvy.client_secret'),
+            'client_id' => ($client = $this->client(($stateData['app'] ?? null) === 'rider'))[0],
+            'client_secret' => $client[1],
             'redirect_uri' => config('zinnvy.redirect_uri'),
             'code' => $code,
         ]);
