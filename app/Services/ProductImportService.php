@@ -69,6 +69,15 @@ class ProductImportService
     }
 
     /** "1,200.50", "$12", "12,50" → float. Blank/garbage → null. */
+    /** A value was typed but isn't a number ("ten", "n/a"): reported, never silently read as 0. */
+    public static function notANumber(mixed $v): bool
+    {
+        $t = strtolower(trim((string) $v));
+
+        // "-", "—" and "n/a" are how spreadsheets say "none": treated as blank, like before.
+        return $v !== null && ! in_array($t, ['', '-', '—', 'n/a', 'na'], true) && self::number($v) === null;
+    }
+
     public static function number(mixed $v): ?float
     {
         if ($v === null || $v === '') {
@@ -119,6 +128,10 @@ class ProductImportService
                 continue;
             }
 
+            if (self::notANumber($get('quantity')) || self::notANumber($get('unit_price'))) {
+                $this->fail($result, $rowNo, 'Quantity or price is not a number ("'.trim((string) (self::notANumber($get('quantity')) ? $get('quantity') : $get('unit_price'))).'")');
+                continue;
+            }
             $qty = self::number($get('quantity')) ?? 0;
             $price = self::number($get('unit_price')) ?? 0;
             if ($qty < 0 || $price < 0) {
@@ -245,6 +258,8 @@ class ProductImportService
 
             if ($name === '') {
                 [$action, $reason] = ['error', 'Product name is empty'];
+            } elseif (self::notANumber($col($row, 'quantity')) || self::notANumber($col($row, 'unit_price'))) {
+                [$action, $reason] = ['error', 'Quantity or price is not a number ("'.trim((string) (self::notANumber($col($row, 'quantity')) ? $col($row, 'quantity') : $col($row, 'unit_price'))).'")'];
             } elseif (($qty ?? 0) < 0 || ($price ?? 0) < 0) {
                 [$action, $reason] = ['error', 'Quantity and price cannot be negative'];
             } elseif ($sku && isset($seenSkus[$sku])) {

@@ -29,6 +29,12 @@ class DispatchPay
         return $this->send(fn (PendingRequest $h) => $h->post('/v1/wallets', ['owner_ref' => $ownerRef, 'kind' => $kind, 'name' => $name]));
     }
 
+    /** Re-times the hold on one payment's money in a wallet; 0 releases it now. */
+    public function release(string $ownerRef, string $paymentIntentId, int $afterMinutes = 0): array
+    {
+        return $this->send(fn (PendingRequest $h) => $h->post('/v1/wallets/'.rawurlencode($ownerRef).'/release', ['payment_intent' => $paymentIntentId, 'after_minutes' => $afterMinutes]));
+    }
+
     public function wallet(string $ownerRef): array
     {
         return $this->send(fn (PendingRequest $h) => $h->get('/v1/wallets/'.rawurlencode($ownerRef)));

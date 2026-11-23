@@ -103,6 +103,8 @@ class ShopOrderService
                 'shop_id' => $shop->id,
                 'number' => max(1000, (int) $last) + 1,
                 'status' => 'new',
+                // Rider deliveries get a private tracking link straight away; it later follows the rider job.
+                'track_token' => $payOnArrival ? \Illuminate\Support\Str::random(32) : null,
                 'customer_name' => trim($data['name']),
                 'customer_phone' => $phone,
                 'customer_email' => $data['email'] ?? null,
@@ -198,6 +200,7 @@ class ShopOrderService
                         throw ValidationException::withMessages(['items' => "{$item->name} was deleted from your products, so it can't be sold."]);
                     }
                     $sale = new Sale([
+                        'basket_id' => 'shop-order-'.$order->id,
                         'product_id' => $item->product_id,
                         'variation_id' => $item->variation_id,
                         'customer_id' => $customer->id,

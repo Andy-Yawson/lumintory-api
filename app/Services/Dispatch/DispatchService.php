@@ -23,6 +23,9 @@ use Illuminate\Validation\ValidationException;
  */
 class DispatchService
 {
+    /** Safety net: a paid but never-confirmed delivery's rider share is released after 7 days unless staff step in. */
+    public const RIDER_HOLD_UNTIL_DELIVERED = 10080;
+
     /** A rider can hold this many unfinished jobs at once. */
     public const MAX_ACTIVE_PER_RIDER = 2;
     public const MAX_OFFER_ROUNDS = 3;
@@ -212,7 +215,8 @@ class DispatchService
         if (! $job->pay_intent_id) {
             $splits = array_values(array_filter([
                 ['owner_ref' => $job->ownerWalletRef(), 'kind' => 'owner', 'amount' => $job->ownerShare(), 'label' => "Order #{$job->order->number}", 'hold_minutes' => (int) Settings::get('owner_hold_minutes')],
-                ['owner_ref' => $rider->walletRef(), 'kind' => 'rider', 'amount' => $job->rider_share, 'label' => "Delivery {$job->code}", 'hold_minutes' => (int) Settings::get('rider_hold_minutes')],
+                // The rider's share is held until the customer's code confirms the handover (deliver() releases it).
+                ['owner_ref' => $rider->walletRef(), 'kind' => 'rider', 'amount' => $job->rider_share, 'label' => "Delivery {$job->code}", 'hold_minutes' => self::RIDER_HOLD_UNTIL_DELIVERED],
             ], fn ($s) => $s['amount'] > 0));
             $this->pay->ensureWallet($job->ownerWalletRef(), 'owner', $job->pickup_name);
             $this->pay->ensureWallet($rider->walletRef(), 'rider', $rider->name);
@@ -278,8 +282,22 @@ class DispatchService
             $rider->increment('deliveries');
         });
         $this->closeOrder($job);
+        $this->releaseRiderShare($rider, $job);
 
         return $job->refresh();
+    }
+
+    /** Delivered: the rider's share starts its normal hold (Commission & fees) from now. Never fails the delivery. */
+    private function releaseRiderShare(Rider $rider, Job $job): void
+    {
+        if (! $job->pay_intent_id || $job->rider_share <= 0) {
+            return;
+        }
+        try {
+            $this->pay->release($rider->walletRef(), $job->pay_intent_id, (int) Settings::get('rider_hold_minutes'));
+        } catch (\Throwable $e) {
+            Log::warning('Dispatch: rider share not released', ['job' => $job->code, 'error' => $e->getMessage()]);
+        }
     }
 
     /** The customer could not or would not pay, or could not be found. Nothing was paid, so nothing is split. */

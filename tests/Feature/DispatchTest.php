@@ -49,6 +49,7 @@ class DispatchTest extends TestCase
             'pay.test/v1/payment_intents/pi_1' => fn () => Http::response(['id' => 'pi_1', 'status' => $this->payStatus]),
             'pay.test/v1/payment_intents' => Http::response(['id' => 'pi_1', 'status' => 'requires_payment', 'checkout_url' => 'https://pay.test/c/?t=abc']),
             'pay.test/v1/wallets/*/adjustments' => Http::response(['id' => 'wal_1']),
+            'pay.test/v1/wallets/*/release' => Http::response(['id' => 'wal_1', 'entries_changed' => 1]),
         ]);
     }
 
@@ -80,6 +81,32 @@ class DispatchTest extends TestCase
         Rider::find($id)->update(['status' => 'active', 'id_number' => 'GHA-1', 'id_photo_path' => 'x', 'selfie_path' => 'y', 'online' => true]);
 
         return [Rider::find($id), User::where('email', $email)->first()];
+    }
+
+    public function test_the_customer_gets_a_tracking_link_at_checkout_that_follows_the_rider_job(): void
+    {
+        $url = $this->postJson('/api/v1/public/shops/akosua/orders', [
+            'name' => 'Ama Mensah', 'phone' => '0244000111', 'fulfilment' => 'delivery', 'address' => 'East Legon', 'landmark' => 'Blue gate',
+            'payment_method' => 'momo_on_delivery', 'lat' => 5.6350, 'lng' => -0.1580, 'consent' => true,
+            'items' => [['product_id' => $this->product->id, 'quantity' => 1]],
+        ])->assertCreated()->json('track_url');
+        $this->assertNotNull($url);
+        $token = substr($url, strrpos($url, '/') + 1);
+        $this->getJson("/api/v1/public/track/{$token}")->assertOk()->assertJsonPath('status', 'awaiting_shop')->assertJsonPath('rider', null)->assertJsonPath('code', null);
+
+        $order = ShopOrder::withoutGlobalScopes()->latest('id')->first();
+        Sanctum::actingAs($this->owner);
+        $this->patchJson("/api/v1/shop/orders/{$order->id}", ['status' => 'confirmed'])->assertOk();
+        $this->activeRider();
+        Sanctum::actingAs($this->owner);
+        $this->postJson("/api/v1/shop/orders/{$order->id}/rider")->assertCreated();
+        $this->getJson("/api/v1/public/track/{$token}")->assertOk()->assertJsonPath('status', 'searching');
+
+        $pickup = $this->postJson('/api/v1/public/shops/akosua/orders', [
+            'name' => 'Yaw', 'phone' => '0244000112', 'fulfilment' => 'pickup', 'consent' => true,
+            'items' => [['product_id' => $this->product->id, 'quantity' => 1]],
+        ])->assertCreated();
+        $this->assertNull($pickup->json('track_url'), 'no rider, no tracking link');
     }
 
     public function test_the_delivery_fee_comes_from_the_admin_bands_and_the_server(): void
@@ -149,8 +176,10 @@ class DispatchTest extends TestCase
             }
             $splits = collect($r['splits'])->keyBy('owner_ref');
 
-            return $r['amount'] === $job->total() && $splits["shop:{$this->tenant->id}"]['amount'] === 20000 && $splits['rider:'.$job->fresh()->rider_id]['amount'] === $job->rider_share;
+            return $r['amount'] === $job->total() && $splits["shop:{$this->tenant->id}"]['amount'] === 20000 && $splits['rider:'.$job->fresh()->rider_id]['amount'] === $job->rider_share
+                && $splits['rider:'.$job->fresh()->rider_id]['hold_minutes'] === \App\Services\Dispatch\DispatchService::RIDER_HOLD_UNTIL_DELIVERED;   // held until handover
         });
+        Http::assertNotSent(fn ($r) => str_ends_with($r->url(), '/release'));
 
         $this->postJson("/api/v1/rider/jobs/{$jobId}/deliver", ['code' => $code])->assertStatus(422)->assertJsonValidationErrors('job');   // not paid
         $this->payStatus = 'succeeded';
@@ -161,6 +190,7 @@ class DispatchTest extends TestCase
         $this->assertSame('completed', ShopOrder::withoutGlobalScopes()->find($order->id)->status);
         $this->assertSame(1, Sale::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
         $this->assertSame(1, $rider->fresh()->deliveries);
+        Http::assertSent(fn ($r) => str_ends_with($r->url(), '/v1/wallets/'.rawurlencode('rider:'.$rider->id).'/release') && $r['payment_intent'] === 'pi_1' && $r['after_minutes'] === 0);
         $this->assertSame(4.0, (float) Product::withoutGlobalScopes()->find($this->product->id)->quantity, 'stock came off');
     }
 

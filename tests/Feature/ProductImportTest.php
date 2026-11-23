@@ -41,6 +41,13 @@ class ProductImportTest extends TestCase
         $this->assertSame(12.5, ProductImportService::number('12,50'));
         $this->assertSame(7.0, ProductImportService::number(7));
         $this->assertNull(ProductImportService::number('n/a'));
+        // A word where a number belongs is reported, not read as 0; spreadsheet "none" markers stay blank.
+        $this->assertTrue(ProductImportService::notANumber('not-a-number'));
+        $this->assertTrue(ProductImportService::notANumber('ten'));
+        $this->assertFalse(ProductImportService::notANumber('-'));
+        $this->assertFalse(ProductImportService::notANumber('n/a'));
+        $this->assertFalse(ProductImportService::notANumber('GHS 50'));
+        $this->assertFalse(ProductImportService::notANumber(null));
     }
 
     public function test_preview_returns_headers_sample_and_a_suggested_mapping(): void

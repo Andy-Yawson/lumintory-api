@@ -128,6 +128,7 @@ class PublicShopController extends Controller
             'shop' => $shop->tenant->name,
             'phone' => $order->customer_phone,
             'momo' => $shop->momo(),
+            'track_url' => $order->track_token ? rtrim((string) config('services.shop.url', 'https://shop.zinnvy.com'), '/').'/track/'.$order->track_token : null,
         ], 201);
     }
 

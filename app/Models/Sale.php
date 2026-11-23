@@ -26,7 +26,14 @@ class Sale extends Model
         'variation_id',
         'discount',
         'stock_deducted',
+        'basket_id',
     ];
+
+    /** Number of checkouts (baskets) in a sales query; a line without a basket counts on its own. */
+    public static function basketCount($query): int
+    {
+        return (int) (clone $query)->toBase()->selectRaw("COUNT(DISTINCT COALESCE(basket_id, CONCAT('line-', id))) as c")->value('c');
+    }
 
     protected $casts = [
         'sale_date' => 'date',

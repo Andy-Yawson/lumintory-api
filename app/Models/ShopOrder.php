@@ -11,7 +11,7 @@ class ShopOrder extends Model
 
     protected $guarded = ['id'];
 
-    protected $hidden = ['ip_hash', 'visitor_id'];
+    protected $hidden = ['ip_hash', 'visitor_id', 'track_token'];
 
     protected $casts = [
         'sale_ids' => 'array',

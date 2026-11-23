@@ -26,7 +26,7 @@ class ReportController extends Controller
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
-        $salesCount = Sale::whereTenantId($tenant->id)->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+        $salesCount = Sale::basketCount(Sale::whereTenantId($tenant->id)->whereBetween('created_at', [$startOfMonth, $endOfMonth]));
         $returnsCount = ReturnItem::whereTenantId($tenant->id)->whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
 
         return response()->json([
@@ -119,10 +119,15 @@ class ReportController extends Controller
             $sales = $export->collection();
 
             // 2. Calculate summary metrics for the Pro header
+            // total_amount is stored after the line's discount (Sale::saving), so gross adds it back and net is the stored sum.
+            $refunds = (float) \App\Models\ReturnItem::whereBetween('return_date', [$start, $end])->sum('refund_amount');
             $summary = [
+                'gross' => $sales->sum(fn ($s) => (float) $s->total_amount + (float) ($s->discount ?? 0)),
                 'total_revenue' => $sales->sum('total_amount'),
                 'total_units' => $sales->sum('quantity'),
                 'total_discount' => $sales->sum('discount'),
+                'refunds' => $refunds,
+                'net' => $sales->sum('total_amount') - $refunds,
                 'period' => $start->format('M d, Y') . ' - ' . $end->format('M d, Y')
             ];
 

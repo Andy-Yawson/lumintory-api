@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dispatch\Job;
+use App\Models\ShopOrder;
 use Illuminate\Support\Facades\Crypt;
 
 /** What a customer sees when they open their tracking link. The unguessable token in the link is the only credential. */
@@ -16,7 +17,8 @@ class DispatchTrackController extends Controller
     {
         abort_unless(strlen($token) >= 24, 404);
         $data = $request->validate(['rating' => 'required|integer|between:1,5', 'comment' => 'nullable|string|max:300']);
-        $job = Job::where('track_token', $token)->firstOrFail();
+        $job = $this->job($token);
+        abort_unless($job, 404);
         if ($job->status !== 'delivered') {
             return response()->json(['message' => 'You can rate once your order has been delivered.'], 422);
         }
@@ -32,7 +34,11 @@ class DispatchTrackController extends Controller
     public function show(string $token)
     {
         abort_unless(strlen($token) >= 24, 404);
-        $job = Job::with(['rider', 'tenant'])->where('track_token', $token)->firstOrFail();
+        $job = $this->job($token);
+        if (! $job) {
+            return $this->orderOnly($token);
+        }
+        $job->load(['rider', 'tenant']);
         $order = $job->order;
         $onTheRoad = in_array($job->status, ['assigned', 'picked_up'], true);
         $symbol = $job->tenant->settings['currency_symbol'] ?? 'GH₵';
@@ -66,6 +72,40 @@ class DispatchTrackController extends Controller
             'can_rate' => $job->status === 'delivered' && $job->rating === null,
             'rating' => $job->rating !== null ? ['value' => $job->rating, 'comment' => $job->rating_comment] : null,
             'updated_at' => ($job->delivered_at ?? $job->picked_up_at ?? $job->assigned_at ?? $job->created_at)?->toIso8601String(),
+        ]);
+    }
+
+    /** The job for a link: the job's own token (SMS), or the order's token (checkout page), which follows the latest job. */
+    private function job(string $token): ?Job
+    {
+        $job = Job::where('track_token', $token)->first();
+        if ($job) {
+            return $job;
+        }
+        $orderId = ShopOrder::withoutGlobalScopes()->where('track_token', $token)->value('id');
+
+        return $orderId ? Job::where('shop_order_id', $orderId)->latest('id')->first() : null;
+    }
+
+    /** Ordered, but the shop hasn't asked for a rider yet. */
+    private function orderOnly(string $token)
+    {
+        $order = ShopOrder::withoutGlobalScopes()->where('track_token', $token)->firstOrFail();
+        $tenant = \App\Models\Tenant::find($order->tenant_id);
+        $symbol = $tenant?->settings['currency_symbol'] ?? 'GH₵';
+        $goods = (float) $order->subtotal;
+        $fee = $order->delivery_fee / 100;
+
+        return response()->json([
+            'shop' => $tenant?->name,
+            'order_number' => $order->number,
+            'status' => $order->status === 'cancelled' ? 'cancelled' : 'awaiting_shop',
+            'steps' => collect(['awaiting_shop' => 'Shop confirms your order'] + self::STEPS)->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+            'currency_symbol' => $symbol,
+            'goods' => $goods, 'delivery_fee' => $fee, 'total' => $goods + $fee,
+            'pay_status' => 'unpaid', 'rider' => null, 'pay_url' => null, 'code' => null, 'code_hint' => null,
+            'failure_reason' => null, 'can_rate' => false, 'rating' => null,
+            'updated_at' => ($order->updated_at ?? $order->created_at)?->toIso8601String(),
         ]);
     }
 }
