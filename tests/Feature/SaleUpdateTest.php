@@ -14,6 +14,25 @@ class SaleUpdateTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_one_checkout_with_several_lines_counts_as_one_sale(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $admin = User::factory()->create(['tenant_id' => $tenant->id, 'role' => 'Administrator']);
+        $this->actingAs($admin, 'sanctum');
+        $a = Product::factory()->create(['tenant_id' => $tenant->id, 'quantity' => 100]);
+        $b = Product::factory()->create(['tenant_id' => $tenant->id, 'quantity' => 100]);
+
+        $this->postJson('/api/v1/sales', ['payment_method' => 'cash', 'overall_discount' => 5, 'items' => [
+            ['product_id' => $a->id, 'quantity' => 2, 'unit_price' => 50],
+            ['product_id' => $b->id, 'quantity' => 1, 'unit_price' => 100],
+        ]])->assertCreated();
+        $this->postJson('/api/v1/sales', ['payment_method' => 'cash', 'items' => [['product_id' => $a->id, 'quantity' => 1, 'unit_price' => 50]]])->assertCreated();
+
+        $this->assertSame(3, Sale::where('tenant_id', $tenant->id)->count(), 'three lines');
+        $this->assertSame(2, Sale::basketCount(Sale::where('tenant_id', $tenant->id)), 'two checkouts');
+        $this->assertEqualsWithDelta(245.0, (float) Sale::where('tenant_id', $tenant->id)->sum('total_amount'), 0.01, 'stored after the discount');
+    }
+
     public function test_editing_a_sale_preserves_its_discount_in_the_recalculated_total(): void
     {
         $tenant = Tenant::factory()->create();

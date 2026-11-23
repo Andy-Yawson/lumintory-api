@@ -181,6 +181,7 @@ class ShopOrderService
                         throw ValidationException::withMessages(['items' => "{$item->name} was deleted from your products, so it can't be sold."]);
                     }
                     $sale = new Sale([
+                        'basket_id' => 'shop-order-'.$order->id,
                         'product_id' => $item->product_id,
                         'variation_id' => $item->variation_id,
                         'customer_id' => $customer->id,

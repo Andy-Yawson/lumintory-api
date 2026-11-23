@@ -100,6 +100,7 @@ class SaleController extends Controller
                 $tenantId = Auth::user()->tenant_id;
 
                 $overallDiscount = (float) ($request->overall_discount ?? 0);
+                $basket = (string) \Illuminate\Support\Str::uuid();
 
                 // 1. Calculate total gross value to determine proportions
                 $totalGross = collect($request->items)->sum(fn($i) => $i['quantity'] * $i['unit_price']);
@@ -117,6 +118,7 @@ class SaleController extends Controller
                     try {
                         $sale = Sale::create([
                         'tenant_id' => $tenantId,
+                        'basket_id' => $basket,
                         'product_id' => $item['product_id'],
                         'variation_id' => $item['variation_id'] ?? null,
                         'customer_id' => $request->customer_id,

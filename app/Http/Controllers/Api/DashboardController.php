@@ -86,7 +86,7 @@ class DashboardController extends Controller
             /** --- END NEW DATA --- **/
 
             $salesAmount = $salesQuery->sum('total_amount');
-            $salesCount = $salesQuery->count();
+            $salesCount = Sale::basketCount($salesQuery);
             $returnsAmount = $returnsQuery->sum('refund_amount');
 
             $topProduct = $topProductQuery->with('product:id,name')

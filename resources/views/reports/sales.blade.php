@@ -149,22 +149,20 @@
 
     <div class="summary-container">
         <div class="summary-card">
-            <div class="summary-label">Total Revenue</div>
-            <div class="summary-value">GHS {{ number_format($summary['total_revenue'], 2) }}</div>
+            <div class="summary-label">Sales before discounts</div>
+            <div class="summary-value">GHS {{ number_format($summary['gross'], 2) }}</div>
         </div>
         <div class="summary-card">
             <div class="summary-label">Units Sold</div>
             <div class="summary-value">{{ number_format($summary['total_units']) }}</div>
         </div>
         <div class="summary-card">
-            <div class="summary-label">Total Discounts</div>
-            <div class="summary-value">GHS {{ number_format($summary['total_discount'], 2) }}</div>
+            <div class="summary-label">Discounts / Refunds</div>
+            <div class="summary-value">GHS {{ number_format($summary['total_discount'], 2) }} / {{ number_format($summary['refunds'], 2) }}</div>
         </div>
         <div class="summary-card" style="margin-right: 0;">
-            <div class="summary-label">Net Sales</div>
-            <div class="summary-value">GHS
-                {{ number_format($summary['total_revenue'] - $summary['total_discount'], 2) }}
-            </div>
+            <div class="summary-label">Net Sales (after discounts and refunds)</div>
+            <div class="summary-value">GHS {{ number_format($summary['net'], 2) }}</div>
         </div>
     </div>
 
